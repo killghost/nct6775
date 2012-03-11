@@ -3,6 +3,10 @@ Note
 
 This driver is experimental and has only been tested on NCT6775F.
 
+ABI (sysfs attribute support) is not final and is expected to change
+repeatedly before the driver is stable. Until then, please feel free
+to provide your input.
+
 This driver supercedes the NCT6775F and NCT6776F support in the W83627EHF
 driver.
 
