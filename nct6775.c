@@ -207,6 +207,7 @@ static const u16 NCT6775_REG_FAN_START_OUTPUT[] = {
 static const u16 NCT6775_REG_FAN_STOP_TIME[] = {
 	0x107, 0x207, 0x307, 0x807, 0x907 };
 static const u16 NCT6775_REG_PWM[] = { 0x109, 0x209, 0x309, 0x809, 0x909 };
+static const u16 NCT6775_REG_PWM_READ[] = { 0x01, 0x03, 0x11, 0x13, 0x15 };
 
 static const u16 NCT6775_REG_FAN_MAX_OUTPUT[] = { 0x10a, 0x20a, 0x30a };
 static const u16 NCT6775_REG_FAN_STEP_OUTPUT[] = { 0x10b, 0x20b, 0x30b };
@@ -667,7 +668,7 @@ static void nct6775_update_pwm(struct device *dev)
 	struct nct6775_data *data = dev_get_drvdata(dev);
 	struct nct6775_sio_data *sio_data = dev->platform_data;
 	int i;
-	int pwmcfg, fanmodecfg, tol;
+	int pwmcfg, fanmodecfg, mode, tol;
 
 	for (i = 0; i < data->pwm_num; i++) {
 		if (!i) {
@@ -681,7 +682,12 @@ static void nct6775_update_pwm(struct device *dev)
 
 		fanmodecfg = nct6775_read_value(data,
 						  NCT6775_REG_FAN_MODE[i]);
-		data->pwm_enable[i] = ((fanmodecfg >> 4) & 7) + 1;
+		data->pwm[i] = nct6775_read_value(data, NCT6775_REG_PWM[i]);
+		mode = ((fanmodecfg >> 4) & 7);
+		if (data->pwm[i] == 255 && mode == 0)
+			data->pwm_enable[i] = 0;
+		else
+			data->pwm_enable[i] = mode + 1;
 		data->tolerance[i][0] = fanmodecfg & 0x0f;
 		if (sio_data->kind == nct6779) {
 			tol = nct6775_read_value(data,
@@ -691,7 +697,6 @@ static void nct6775_update_pwm(struct device *dev)
 		data->tolerance[i][1] =
 			nct6775_read_value(data,
 					NCT6775_REG_CRITICAL_TEMP_TOLERANCE[i]);
-		data->pwm[i] = nct6775_read_value(data, NCT6775_REG_PWM[i]);
 	}
 }
 
@@ -1455,7 +1460,24 @@ static ssize_t show_##reg(struct device *dev, struct device_attribute *attr, \
 
 show_pwm_reg(pwm_mode)
 show_pwm_reg(pwm_enable)
-show_pwm_reg(pwm)
+
+static ssize_t show_pwm(struct device *dev, struct device_attribute *attr,
+			char *buf)
+{
+	struct nct6775_data *data = nct6775_update_device(dev);
+	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
+	int nr = sensor_attr->index;
+
+	/*
+	 * For automatic fan control modes, show current pwm readings.
+	 * Otherwise, show the configured value.
+	 */
+	return sprintf(buf, "%d\n",
+		       data->pwm_mode[nr] > 1 ?
+				data->pwm[nr] :
+				nct6775_read_value(data,
+						   NCT6775_REG_PWM_READ[nr]));
+}
 
 static ssize_t
 store_pwm_mode(struct device *dev, struct device_attribute *attr,
@@ -1557,7 +1579,7 @@ store_pwm_enable(struct device *dev, struct device_attribute *attr,
 	if (err < 0)
 		return err;
 
-	if (!val || val > 5)
+	if (val > 5)
 		return -EINVAL;
 
 	/* SmartFan III mode is only supported on NCT6775F */
@@ -1572,6 +1594,14 @@ store_pwm_enable(struct device *dev, struct device_attribute *attr,
 
 	mutex_lock(&data->update_lock);
 	data->pwm_enable[nr] = val;
+	if (!val) {
+		/*
+		 * turn off pwm control: select manual mode, set pwm to maximum
+		 */
+		val = 1;
+		data->pwm[nr] = 255;
+		nct6775_write_value(data, NCT6775_REG_PWM[nr], 255);
+	}
 	reg = nct6775_read_value(data, NCT6775_REG_FAN_MODE[nr]);
 	reg &= 0x0f;
 	reg |= (val - 1) << 4;
