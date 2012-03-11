@@ -1614,41 +1614,51 @@ store_target_temp(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
-static ssize_t show_tolerance(struct device *dev, struct device_attribute *attr,
-			      char *buf)
+static ssize_t show_auto_hysteresis(struct device *dev,
+				    struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
+	int nr = sattr->nr;
+	int point = sattr->index >= data->auto_pwm_num ? 1 : 0;
+	int tolerance = data->tolerance[nr][point];
+	int temp = data->auto_temp[nr][sattr->index];
 
-	return sprintf(buf, "%d\n",
-		       data->tolerance[sattr->nr][sattr->index] * 1000);
+	return sprintf(buf, "%d\n", (temp - tolerance) * 1000);
 }
 
 static ssize_t
-store_tolerance(struct device *dev, struct device_attribute *attr,
-		const char *buf, size_t count)
+store_auto_hysteresis(struct device *dev, struct device_attribute *attr,
+		      const char *buf, size_t count)
 {
 	struct nct6775_data *data = dev_get_drvdata(dev);
 	struct nct6775_sio_data *sio_data = dev->platform_data;
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
 	int nr = sattr->nr;
-	int point = sattr->index;
+	int point = sattr->index >= data->auto_pwm_num ? 1 : 0;
 	u16 reg;
 	long val;
 	int err;
-	int maxlimit[] = { 15, 7, 63 };
+	int maxlimit[2][3] = { { 15, 7, 63 }, { 15, 7, 7 } };
 	int mask[] = { 0x0f, 0x07, 0x07 };
+	int temp;
 
 	err = kstrtol(buf, 10, &val);
 	if (err < 0)
 		return err;
 
-	/* Limit the temp to 0C - 31C */
-	val = SENSORS_LIMIT(DIV_ROUND_CLOSEST(val, 1000), 0,
-			    point ? 7 : maxlimit[sio_data->kind]);
+	temp = data->auto_temp[nr][sattr->index];
+	val = temp - DIV_ROUND_CLOSEST(val, 1000);
+
+	/* Limit tolerance as needed */
+	val = SENSORS_LIMIT(val, 0, maxlimit[point][sio_data->kind]);
 
 	mutex_lock(&data->update_lock);
-	if (point == 0) {
+	if (point) {
+		nct6775_write_value(data,
+				    NCT6775_REG_CRITICAL_TEMP_TOLERANCE[nr],
+				    val);
+	} else {
 		reg = nct6775_read_value(data, NCT6775_REG_FAN_MODE[nr]);
 		reg = (reg & ~mask[nr]) | (val & mask[nr]);
 		nct6775_write_value(data, NCT6775_REG_FAN_MODE[nr], reg);
@@ -1659,10 +1669,6 @@ store_tolerance(struct device *dev, struct device_attribute *attr,
 			nct6775_write_value(data,
 					    NCT6779_REG_TOLERANCE_H[nr], reg);
 		}
-	} else {
-		nct6775_write_value(data,
-				    NCT6775_REG_CRITICAL_TEMP_TOLERANCE[nr],
-				    val);
 	}
 
 	data->tolerance[nr][point] = val;
@@ -1708,28 +1714,6 @@ static SENSOR_DEVICE_ATTR(pwm4_target, S_IWUSR | S_IRUGO, show_target_temp,
 			  store_target_temp, 3);
 static SENSOR_DEVICE_ATTR(pwm5_target, S_IWUSR | S_IRUGO, show_target_temp,
 			  store_target_temp, 4);
-
-static SENSOR_DEVICE_ATTR_2(pwm1_tolerance, S_IWUSR | S_IRUGO, show_tolerance,
-			  store_tolerance, 0, 0);
-static SENSOR_DEVICE_ATTR_2(pwm2_tolerance, S_IWUSR | S_IRUGO, show_tolerance,
-			  store_tolerance, 1, 0);
-static SENSOR_DEVICE_ATTR_2(pwm3_tolerance, S_IWUSR | S_IRUGO, show_tolerance,
-			  store_tolerance, 2, 0);
-static SENSOR_DEVICE_ATTR_2(pwm4_tolerance, S_IWUSR | S_IRUGO, show_tolerance,
-			  store_tolerance, 3, 0);
-static SENSOR_DEVICE_ATTR_2(pwm5_tolerance, S_IWUSR | S_IRUGO, show_tolerance,
-			  store_tolerance, 4, 0);
-
-static SENSOR_DEVICE_ATTR_2(pwm1_tolerance1, S_IWUSR | S_IRUGO, show_tolerance,
-			  store_tolerance, 0, 1);
-static SENSOR_DEVICE_ATTR_2(pwm2_tolerance1, S_IWUSR | S_IRUGO, show_tolerance,
-			  store_tolerance, 1, 1);
-static SENSOR_DEVICE_ATTR_2(pwm3_tolerance1, S_IWUSR | S_IRUGO, show_tolerance,
-			  store_tolerance, 2, 1);
-static SENSOR_DEVICE_ATTR_2(pwm4_tolerance1, S_IWUSR | S_IRUGO, show_tolerance,
-			  store_tolerance, 3, 1);
-static SENSOR_DEVICE_ATTR_2(pwm5_tolerance1, S_IWUSR | S_IRUGO, show_tolerance,
-			  store_tolerance, 4, 1);
 
 /* Smart Fan registers */
 
@@ -1870,14 +1854,12 @@ static SENSOR_DEVICE_ATTR(pwm4_stop_output, S_IWUSR | S_IRUGO,
 static SENSOR_DEVICE_ATTR(pwm5_stop_output, S_IWUSR | S_IRUGO,
 			  show_fan_stop_output, store_fan_stop_output, 4);
 
-static struct attribute *nct6775_attributes_pwm[5][12] = {
+static struct attribute *nct6775_attributes_pwm[5][10] = {
 	{
 		&sensor_dev_attr_pwm1.dev_attr.attr,
 		&sensor_dev_attr_pwm1_mode.dev_attr.attr,
 		&sensor_dev_attr_pwm1_enable.dev_attr.attr,
 		&sensor_dev_attr_pwm1_target.dev_attr.attr,
-		&sensor_dev_attr_pwm1_tolerance.dev_attr.attr,
-		&sensor_dev_attr_pwm1_tolerance1.dev_attr.attr,
 		&sensor_dev_attr_pwm1_stop_time.dev_attr.attr,
 		&sensor_dev_attr_pwm1_step_up_time.dev_attr.attr,
 		&sensor_dev_attr_pwm1_step_down_time.dev_attr.attr,
@@ -1890,8 +1872,6 @@ static struct attribute *nct6775_attributes_pwm[5][12] = {
 		&sensor_dev_attr_pwm2_mode.dev_attr.attr,
 		&sensor_dev_attr_pwm2_enable.dev_attr.attr,
 		&sensor_dev_attr_pwm2_target.dev_attr.attr,
-		&sensor_dev_attr_pwm2_tolerance.dev_attr.attr,
-		&sensor_dev_attr_pwm2_tolerance1.dev_attr.attr,
 		&sensor_dev_attr_pwm2_stop_time.dev_attr.attr,
 		&sensor_dev_attr_pwm2_step_up_time.dev_attr.attr,
 		&sensor_dev_attr_pwm2_step_down_time.dev_attr.attr,
@@ -1904,8 +1884,6 @@ static struct attribute *nct6775_attributes_pwm[5][12] = {
 		&sensor_dev_attr_pwm3_mode.dev_attr.attr,
 		&sensor_dev_attr_pwm3_enable.dev_attr.attr,
 		&sensor_dev_attr_pwm3_target.dev_attr.attr,
-		&sensor_dev_attr_pwm3_tolerance.dev_attr.attr,
-		&sensor_dev_attr_pwm3_tolerance1.dev_attr.attr,
 		&sensor_dev_attr_pwm3_stop_time.dev_attr.attr,
 		&sensor_dev_attr_pwm3_step_up_time.dev_attr.attr,
 		&sensor_dev_attr_pwm3_step_down_time.dev_attr.attr,
@@ -1918,8 +1896,6 @@ static struct attribute *nct6775_attributes_pwm[5][12] = {
 		&sensor_dev_attr_pwm4_mode.dev_attr.attr,
 		&sensor_dev_attr_pwm4_enable.dev_attr.attr,
 		&sensor_dev_attr_pwm4_target.dev_attr.attr,
-		&sensor_dev_attr_pwm4_tolerance.dev_attr.attr,
-		&sensor_dev_attr_pwm4_tolerance1.dev_attr.attr,
 		&sensor_dev_attr_pwm4_stop_time.dev_attr.attr,
 		&sensor_dev_attr_pwm4_step_up_time.dev_attr.attr,
 		&sensor_dev_attr_pwm4_step_down_time.dev_attr.attr,
@@ -1932,8 +1908,6 @@ static struct attribute *nct6775_attributes_pwm[5][12] = {
 		&sensor_dev_attr_pwm5_mode.dev_attr.attr,
 		&sensor_dev_attr_pwm5_enable.dev_attr.attr,
 		&sensor_dev_attr_pwm5_target.dev_attr.attr,
-		&sensor_dev_attr_pwm5_tolerance.dev_attr.attr,
-		&sensor_dev_attr_pwm5_tolerance1.dev_attr.attr,
 		&sensor_dev_attr_pwm5_stop_time.dev_attr.attr,
 		&sensor_dev_attr_pwm5_step_up_time.dev_attr.attr,
 		&sensor_dev_attr_pwm5_step_down_time.dev_attr.attr,
@@ -2105,146 +2079,216 @@ static struct sensor_device_attribute_2 sda_auto_pwm_arrays[] = {
 			  show_auto_pwm, store_auto_pwm, 0, 0),
 	SENSOR_ATTR_2(pwm1_auto_point1_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 0, 0),
+	SENSOR_ATTR_2(pwm1_auto_point1_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 0, 0),
 	SENSOR_ATTR_2(pwm1_auto_point2_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 0, 1),
 	SENSOR_ATTR_2(pwm1_auto_point2_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 0, 1),
+	SENSOR_ATTR_2(pwm1_auto_point2_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 0, 1),
 	SENSOR_ATTR_2(pwm1_auto_point3_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 0, 2),
 	SENSOR_ATTR_2(pwm1_auto_point3_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 0, 2),
+	SENSOR_ATTR_2(pwm1_auto_point3_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 0, 2),
 	SENSOR_ATTR_2(pwm1_auto_point4_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 0, 3),
 	SENSOR_ATTR_2(pwm1_auto_point4_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 0, 3),
+	SENSOR_ATTR_2(pwm1_auto_point4_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 0, 3),
 	SENSOR_ATTR_2(pwm1_auto_point5_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 0, 4),
 	SENSOR_ATTR_2(pwm1_auto_point5_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 0, 4),
+	SENSOR_ATTR_2(pwm1_auto_point5_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 0, 4),
 	SENSOR_ATTR_2(pwm1_auto_point6_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 0, 5),
 	SENSOR_ATTR_2(pwm1_auto_point6_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 0, 5),
+	SENSOR_ATTR_2(pwm1_auto_point6_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 0, 5),
 	SENSOR_ATTR_2(pwm1_auto_point7_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 0, 6),
 	SENSOR_ATTR_2(pwm1_auto_point7_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 0, 6),
+	SENSOR_ATTR_2(pwm1_auto_point7_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 0, 6),
 
 	SENSOR_ATTR_2(pwm2_auto_point1_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 1, 0),
 	SENSOR_ATTR_2(pwm2_auto_point1_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 1, 0),
+	SENSOR_ATTR_2(pwm2_auto_point1_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 1, 0),
 	SENSOR_ATTR_2(pwm2_auto_point2_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 1, 1),
 	SENSOR_ATTR_2(pwm2_auto_point2_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 1, 1),
+	SENSOR_ATTR_2(pwm2_auto_point2_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 1, 1),
 	SENSOR_ATTR_2(pwm2_auto_point3_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 1, 2),
 	SENSOR_ATTR_2(pwm2_auto_point3_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 1, 2),
+	SENSOR_ATTR_2(pwm2_auto_point3_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 1, 2),
 	SENSOR_ATTR_2(pwm2_auto_point4_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 1, 3),
 	SENSOR_ATTR_2(pwm2_auto_point4_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 1, 3),
+	SENSOR_ATTR_2(pwm2_auto_point4_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 1, 3),
 	SENSOR_ATTR_2(pwm2_auto_point5_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 1, 4),
 	SENSOR_ATTR_2(pwm2_auto_point5_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 1, 4),
+	SENSOR_ATTR_2(pwm2_auto_point5_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 1, 4),
 	SENSOR_ATTR_2(pwm2_auto_point6_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 1, 5),
 	SENSOR_ATTR_2(pwm2_auto_point6_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 1, 5),
+	SENSOR_ATTR_2(pwm2_auto_point6_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 1, 5),
 	SENSOR_ATTR_2(pwm2_auto_point7_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 1, 6),
 	SENSOR_ATTR_2(pwm2_auto_point7_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 1, 6),
+	SENSOR_ATTR_2(pwm2_auto_point7_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 1, 6),
 
 	SENSOR_ATTR_2(pwm3_auto_point1_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 2, 0),
 	SENSOR_ATTR_2(pwm3_auto_point1_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 2, 0),
+	SENSOR_ATTR_2(pwm3_auto_point1_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 2, 0),
 	SENSOR_ATTR_2(pwm3_auto_point2_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 2, 1),
 	SENSOR_ATTR_2(pwm3_auto_point2_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 2, 1),
+	SENSOR_ATTR_2(pwm3_auto_point2_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 2, 1),
 	SENSOR_ATTR_2(pwm3_auto_point3_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 2, 2),
 	SENSOR_ATTR_2(pwm3_auto_point3_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 2, 2),
+	SENSOR_ATTR_2(pwm3_auto_point3_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 2, 2),
 	SENSOR_ATTR_2(pwm3_auto_point4_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 2, 3),
 	SENSOR_ATTR_2(pwm3_auto_point4_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 2, 3),
+	SENSOR_ATTR_2(pwm3_auto_point4_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 2, 3),
 	SENSOR_ATTR_2(pwm3_auto_point5_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 2, 4),
 	SENSOR_ATTR_2(pwm3_auto_point5_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 2, 4),
+	SENSOR_ATTR_2(pwm3_auto_point5_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 2, 4),
 	SENSOR_ATTR_2(pwm3_auto_point6_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 2, 5),
 	SENSOR_ATTR_2(pwm3_auto_point6_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 2, 5),
+	SENSOR_ATTR_2(pwm3_auto_point6_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 2, 5),
 	SENSOR_ATTR_2(pwm3_auto_point7_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 2, 6),
 	SENSOR_ATTR_2(pwm3_auto_point7_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 2, 6),
+	SENSOR_ATTR_2(pwm3_auto_point7_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 2, 6),
 
 	SENSOR_ATTR_2(pwm4_auto_point1_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 3, 0),
 	SENSOR_ATTR_2(pwm4_auto_point1_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 3, 0),
+	SENSOR_ATTR_2(pwm4_auto_point1_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 3, 0),
 	SENSOR_ATTR_2(pwm4_auto_point2_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 3, 1),
 	SENSOR_ATTR_2(pwm4_auto_point2_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 3, 1),
+	SENSOR_ATTR_2(pwm4_auto_point2_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 3, 1),
 	SENSOR_ATTR_2(pwm4_auto_point3_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 3, 2),
 	SENSOR_ATTR_2(pwm4_auto_point3_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 3, 2),
+	SENSOR_ATTR_2(pwm4_auto_point3_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 3, 2),
 	SENSOR_ATTR_2(pwm4_auto_point4_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 3, 3),
 	SENSOR_ATTR_2(pwm4_auto_point4_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 3, 3),
+	SENSOR_ATTR_2(pwm4_auto_point4_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 3, 3),
 	SENSOR_ATTR_2(pwm4_auto_point5_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 3, 4),
 	SENSOR_ATTR_2(pwm4_auto_point5_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 3, 4),
+	SENSOR_ATTR_2(pwm4_auto_point5_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 3, 4),
 	SENSOR_ATTR_2(pwm4_auto_point6_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 3, 5),
 	SENSOR_ATTR_2(pwm4_auto_point6_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 3, 5),
+	SENSOR_ATTR_2(pwm4_auto_point6_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 3, 5),
 	SENSOR_ATTR_2(pwm4_auto_point7_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 3, 6),
 	SENSOR_ATTR_2(pwm4_auto_point7_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 3, 6),
+	SENSOR_ATTR_2(pwm4_auto_point7_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 3, 6),
 
 	SENSOR_ATTR_2(pwm5_auto_point1_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 4, 0),
 	SENSOR_ATTR_2(pwm5_auto_point1_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 4, 0),
+	SENSOR_ATTR_2(pwm5_auto_point1_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 4, 0),
 	SENSOR_ATTR_2(pwm5_auto_point2_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 4, 1),
 	SENSOR_ATTR_2(pwm5_auto_point2_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 4, 1),
+	SENSOR_ATTR_2(pwm5_auto_point2_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 4, 1),
 	SENSOR_ATTR_2(pwm5_auto_point3_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 4, 2),
 	SENSOR_ATTR_2(pwm5_auto_point3_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 4, 2),
+	SENSOR_ATTR_2(pwm5_auto_point3_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 4, 2),
 	SENSOR_ATTR_2(pwm5_auto_point4_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 4, 3),
 	SENSOR_ATTR_2(pwm5_auto_point4_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 4, 3),
+	SENSOR_ATTR_2(pwm5_auto_point4_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 4, 3),
 	SENSOR_ATTR_2(pwm5_auto_point5_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 4, 4),
 	SENSOR_ATTR_2(pwm5_auto_point5_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 4, 4),
+	SENSOR_ATTR_2(pwm5_auto_point5_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 4, 4),
 	SENSOR_ATTR_2(pwm5_auto_point6_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 4, 5),
 	SENSOR_ATTR_2(pwm5_auto_point6_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 4, 5),
+	SENSOR_ATTR_2(pwm5_auto_point6_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 4, 5),
 	SENSOR_ATTR_2(pwm5_auto_point7_pwm, S_IWUSR | S_IRUGO,
 			  show_auto_pwm, store_auto_pwm, 4, 6),
 	SENSOR_ATTR_2(pwm5_auto_point7_temp, S_IWUSR | S_IRUGO,
 			  show_auto_temp, store_auto_temp, 4, 6),
+	SENSOR_ATTR_2(pwm5_auto_point7_hysteresis, S_IWUSR | S_IRUGO,
+			  show_auto_hysteresis, store_auto_hysteresis, 4, 6),
 };
 
 static ssize_t
