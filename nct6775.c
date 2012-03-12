@@ -1585,9 +1585,54 @@ store_pwm_enable(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
+static ssize_t
+show_pwm_temp_src(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct nct6775_data *data = nct6775_update_device(dev);
+	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
+	int nr = sensor_attr->index;
+	return sprintf(buf, "%d\n", data->temp_src[nr]);
+}
 
-static ssize_t show_target_temp(struct device *dev,
-				struct device_attribute *attr, char *buf)
+static ssize_t
+store_pwm_temp_src(struct device *dev, struct device_attribute *attr,
+		   const char *buf, size_t count)
+{
+	struct nct6775_data *data = nct6775_update_device(dev);
+	struct nct6775_sio_data *sio_data = dev->platform_data;
+	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
+	int nr = sensor_attr->index;
+	unsigned long val;
+	int err;
+	int reg;
+	static const int max_src[] = {
+	    ARRAY_SIZE(nct6775_temp_label),
+	    ARRAY_SIZE(nct6776_temp_label),
+	    ARRAY_SIZE(nct6779_temp_label)
+	};
+
+	err = kstrtoul(buf, 10, &val);
+	if (err < 0)
+		return err;
+	if (val == 0 || val >= max_src[sio_data->kind])
+		return -EINVAL;
+
+	if (!strlen(data->temp_label[val]))
+		return -EINVAL;
+
+	mutex_lock(&data->update_lock);
+	data->temp_src[nr] = val;
+	reg = nct6775_read_value(data, NCT6775_REG_TEMP_SOURCE[nr]);
+	reg &= 0xe0;
+	reg |= val;
+	nct6775_write_value(data, NCT6775_REG_TEMP_SOURCE[nr], reg);
+	mutex_unlock(&data->update_lock);
+
+	return count;
+}
+
+static ssize_t
+show_target_temp(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
 	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
@@ -1619,8 +1664,9 @@ store_target_temp(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
-static ssize_t show_auto_temp_hyst(struct device *dev,
-				   struct device_attribute *attr, char *buf)
+static ssize_t
+show_auto_temp_hyst(struct device *dev, struct device_attribute *attr,
+		    char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
@@ -1708,6 +1754,17 @@ static SENSOR_DEVICE_ATTR(pwm4_enable, S_IWUSR | S_IRUGO, show_pwm_enable,
 			  store_pwm_enable, 3);
 static SENSOR_DEVICE_ATTR(pwm5_enable, S_IWUSR | S_IRUGO, show_pwm_enable,
 			  store_pwm_enable, 4);
+
+static SENSOR_DEVICE_ATTR(pwm1_temp_src, S_IWUSR | S_IRUGO, show_pwm_temp_src,
+			  store_pwm_temp_src, 6);
+static SENSOR_DEVICE_ATTR(pwm2_temp_src, S_IWUSR | S_IRUGO, show_pwm_temp_src,
+			  store_pwm_temp_src, 7);
+static SENSOR_DEVICE_ATTR(pwm3_temp_src, S_IWUSR | S_IRUGO, show_pwm_temp_src,
+			  store_pwm_temp_src, 8);
+static SENSOR_DEVICE_ATTR(pwm4_temp_src, S_IWUSR | S_IRUGO, show_pwm_temp_src,
+			  store_pwm_temp_src, 9);
+static SENSOR_DEVICE_ATTR(pwm5_temp_src, S_IWUSR | S_IRUGO, show_pwm_temp_src,
+			  store_pwm_temp_src, 10);
 
 static SENSOR_DEVICE_ATTR(pwm1_target, S_IWUSR | S_IRUGO, show_target_temp,
 			  store_target_temp, 0);
@@ -1857,11 +1914,12 @@ static SENSOR_DEVICE_ATTR(pwm4_stop_output, S_IWUSR | S_IRUGO,
 static SENSOR_DEVICE_ATTR(pwm5_stop_output, S_IWUSR | S_IRUGO,
 			  show_fan_stop_output, store_fan_stop_output, 4);
 
-static struct attribute *nct6775_attributes_pwm[5][10] = {
+static struct attribute *nct6775_attributes_pwm[5][11] = {
 	{
 		&sensor_dev_attr_pwm1.dev_attr.attr,
 		&sensor_dev_attr_pwm1_mode.dev_attr.attr,
 		&sensor_dev_attr_pwm1_enable.dev_attr.attr,
+		&sensor_dev_attr_pwm1_temp_src.dev_attr.attr,
 		&sensor_dev_attr_pwm1_target.dev_attr.attr,
 		&sensor_dev_attr_pwm1_stop_time.dev_attr.attr,
 		&sensor_dev_attr_pwm1_step_up_time.dev_attr.attr,
@@ -1874,6 +1932,7 @@ static struct attribute *nct6775_attributes_pwm[5][10] = {
 		&sensor_dev_attr_pwm2.dev_attr.attr,
 		&sensor_dev_attr_pwm2_mode.dev_attr.attr,
 		&sensor_dev_attr_pwm2_enable.dev_attr.attr,
+		&sensor_dev_attr_pwm2_temp_src.dev_attr.attr,
 		&sensor_dev_attr_pwm2_target.dev_attr.attr,
 		&sensor_dev_attr_pwm2_stop_time.dev_attr.attr,
 		&sensor_dev_attr_pwm2_step_up_time.dev_attr.attr,
@@ -1886,6 +1945,7 @@ static struct attribute *nct6775_attributes_pwm[5][10] = {
 		&sensor_dev_attr_pwm3.dev_attr.attr,
 		&sensor_dev_attr_pwm3_mode.dev_attr.attr,
 		&sensor_dev_attr_pwm3_enable.dev_attr.attr,
+		&sensor_dev_attr_pwm3_temp_src.dev_attr.attr,
 		&sensor_dev_attr_pwm3_target.dev_attr.attr,
 		&sensor_dev_attr_pwm3_stop_time.dev_attr.attr,
 		&sensor_dev_attr_pwm3_step_up_time.dev_attr.attr,
@@ -1898,6 +1958,7 @@ static struct attribute *nct6775_attributes_pwm[5][10] = {
 		&sensor_dev_attr_pwm4.dev_attr.attr,
 		&sensor_dev_attr_pwm4_mode.dev_attr.attr,
 		&sensor_dev_attr_pwm4_enable.dev_attr.attr,
+		&sensor_dev_attr_pwm4_temp_src.dev_attr.attr,
 		&sensor_dev_attr_pwm4_target.dev_attr.attr,
 		&sensor_dev_attr_pwm4_stop_time.dev_attr.attr,
 		&sensor_dev_attr_pwm4_step_up_time.dev_attr.attr,
@@ -1910,6 +1971,7 @@ static struct attribute *nct6775_attributes_pwm[5][10] = {
 		&sensor_dev_attr_pwm5.dev_attr.attr,
 		&sensor_dev_attr_pwm5_mode.dev_attr.attr,
 		&sensor_dev_attr_pwm5_enable.dev_attr.attr,
+		&sensor_dev_attr_pwm5_temp_src.dev_attr.attr,
 		&sensor_dev_attr_pwm5_target.dev_attr.attr,
 		&sensor_dev_attr_pwm5_stop_time.dev_attr.attr,
 		&sensor_dev_attr_pwm5_step_up_time.dev_attr.attr,
