@@ -2943,7 +2943,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 exit_remove:
 	nct6775_device_remove_files(dev);
 exit_release:
-	platform_set_drvdata(pdev, NULL);
 	release_region(res->start, IOREGION_LENGTH);
 exit:
 	return err;
@@ -2956,7 +2955,6 @@ static int __devexit nct6775_remove(struct platform_device *pdev)
 	hwmon_device_unregister(data->hwmon_dev);
 	nct6775_device_remove_files(&pdev->dev);
 	release_region(data->addr, IOREGION_LENGTH);
-	platform_set_drvdata(pdev, NULL);
 
 	return 0;
 }
