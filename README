@@ -88,13 +88,13 @@ pwm[1-5] - this file stores PWM duty cycle or DC value (fan speed) in range:
 	   0 (stop) to 255 (full)
 
 pwm[1-5]_enable - this file controls mode of fan/temperature control:
+	* 0 Fan control disabled (fans set to maximum speed)
 	* 1 Manual mode, write to pwm file any value 0-255 (full speed)
 	* 2 "Thermal Cruise" mode
 	* 3 "Fan Speed Cruise" mode
-	* 4 "Smart Fan III" mode
-	* 5 "Smart Fan IV" mode
+	* 4 "Smart Fan IV" mode
 
-	SmartFan III mode is not supported on NCT6776F and NCT6779D.
+	SmartFan III mode is not supported by the driver.
 
 pwm[1-5]_mode - controls if output is PWM or DC level
         * 0 DC output (0 - 12v)
@@ -105,22 +105,32 @@ Thermal Cruise mode
 
 If the temperature is in the range defined by:
 
-pwm[1-4]_target    - set target temperature, unit millidegree Celsius
-		     (range 0 - 127000)
-pwm[1-4]_tolerance - tolerance, unit millidegree Celsius (range 0 - 15000)
+pwm[1-5]_target 	Target temperature, unit millidegree Celsius
+			(range 0 - 127000)
+pwm[1-5]_auto_temp1_hyst
+			Hysteresis, unit millidegree Celsius
+			Hysteresis value is relative to pwm[1-5]_auto_temp1.
 
-There are no changes to fan speed. Once the temperature leaves the interval,
-fan speed increases (temp is higher) or decreases if lower than desired.
-There are defined steps and times, but not exported by the driver yet.
+there are no changes to fan speed. Once the temperature leaves the interval,
+fan speed increases (temp is higher) or decreases if lower than desired,
+using the following steps and times.
 
-pwm[1-4]_min_output - minimum fan speed (range 1 - 255), when the temperature
-                      is below defined range.
-pwm[1-4]_stop_time  - how many milliseconds [ms] must elapse to switch
-                      corresponding fan off. (when the temperature was below
-                      defined range).
+pwm[1-5]_start_output	fan pwm start value (range 1 - 255), to start fan
+			when the temperature is above defined range.
+pwm[1-5]_stop_output	fan pwm (range 1 - 255) to stop fan.
+pwm[1-5]_step_up_time	milliseconds [ms] before fan speed is increased
+pwm[1-5]_step_down_time	milliseconds [ms] before fan speed is decreased
+pwm[1-5]_stop_time	how many milliseconds [ms] must elapse to switch
+                      	corresponding fan off. (when the temperature was below
+                      	defined range).
 
-Note: last two functions are influenced by other control bits, not yet exported
-      by the driver, so a change might not have any effect.
+Speed Cruise mode
+-----------------
+
+This modes tries to keep the fan speed constant.
+Untested; use at your own risk.
+Support may be removed in a later version of the driver.
+
 
 Implementation Details
 ----------------------

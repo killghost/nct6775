@@ -209,8 +209,6 @@ static const u16 NCT6775_REG_FAN_STOP_TIME[] = {
 static const u16 NCT6775_REG_PWM[] = { 0x109, 0x209, 0x309, 0x809, 0x909 };
 static const u16 NCT6775_REG_PWM_READ[] = { 0x01, 0x03, 0x11, 0x13, 0x15 };
 
-static const u16 NCT6775_REG_FAN_MAX_OUTPUT[] = { 0x10a, 0x20a, 0x30a };
-static const u16 NCT6775_REG_FAN_STEP_OUTPUT[] = { 0x10b, 0x20b, 0x30b };
 static const u16 NCT6775_REG_FAN[] = { 0x630, 0x632, 0x634, 0x636, 0x638 };
 
 static const u16 NCT6776_REG_FAN_MIN[] = { 0x63a, 0x63c, 0x63e, 0x640, 0x642};
@@ -344,6 +342,26 @@ static const char *const nct6779_temp_label[] = {
 
 #define NUM_REG_TEMP	ARRAY_SIZE(NCT6775_REG_TEMP)
 
+static inline int reg_to_pwm_enable(int pwm, int mode)
+{
+	if (mode == 0 && pwm == 255)
+		return 0;	/* off	*/
+	if (mode == 3)		/* SmartFan III */
+	 	return 2;	/* convert to thermal cruise */
+	if (mode < 3)
+		return mode + 1;
+	return 4;		/* SmartFan IV */
+}
+
+static inline int pwm_enable_to_reg(int mode)
+{
+	if (mode == 0)
+		return 0;
+	if (mode < 4)
+	 	return mode - 1;
+	return 4;
+}
+
 static int is_word_sized(u16 reg)
 {
 	return ((((reg & 0xff00) == 0x100
@@ -460,8 +478,6 @@ struct nct6775_data {
 	const u16 *REG_FAN_MIN;
 	const u16 *REG_FAN_START_OUTPUT;
 	const u16 *REG_FAN_STOP_OUTPUT;
-	const u16 *REG_FAN_MAX_OUTPUT;
-	const u16 *REG_FAN_STEP_OUTPUT;
 
 	unsigned int (*fan_from_reg)(u16 reg, unsigned int divreg);
 	unsigned int (*fan_from_reg_min)(u16 reg, unsigned int divreg);
@@ -491,13 +507,12 @@ struct nct6775_data {
 	u8 caseopen;
 
 	u8 pwm_mode[5]; /* 0->DC variable voltage, 1->PWM variable duty cycle */
-	u8 pwm_enable[5]; /* 1->manual
+	u8 pwm_enable[5]; /* 0->off
+			   * 1->manual
 			   * 2->thermal cruise mode (also called SmartFan I)
 			   * 3->fan speed cruise mode
-			   * 4->variable thermal cruise (also called
-			   * SmartFan III)
-			   * 5->enhanced variable thermal cruise (also called
-			   * SmartFan IV)
+			   * 4->enhanced variable thermal cruise (also called
+			   *    SmartFan IV)
 			   */
 	u8 pwm_num;		/* number of pwm */
 	u8 pwm[5];
@@ -509,8 +524,6 @@ struct nct6775_data {
 	u8 fan_stop_time[5]; /* time at minimum before disabling fan */
 	u8 fan_step_up_time[5];
 	u8 fan_step_down_time[5];
-	u8 fan_max_output[5]; /* maximum fan speed */
-	u8 fan_step_output[5]; /* rate of change output value */
 
 	/* Automatic fan speed control registers */
 	int auto_pwm_num;
@@ -668,7 +681,7 @@ static void nct6775_update_pwm(struct device *dev)
 	struct nct6775_data *data = dev_get_drvdata(dev);
 	struct nct6775_sio_data *sio_data = dev->platform_data;
 	int i;
-	int pwmcfg, fanmodecfg, mode, tol;
+	int pwmcfg, fanmodecfg, tol;
 
 	for (i = 0; i < data->pwm_num; i++) {
 		if (!i) {
@@ -683,11 +696,9 @@ static void nct6775_update_pwm(struct device *dev)
 		fanmodecfg = nct6775_read_value(data,
 						  NCT6775_REG_FAN_MODE[i]);
 		data->pwm[i] = nct6775_read_value(data, NCT6775_REG_PWM[i]);
-		mode = ((fanmodecfg >> 4) & 7);
-		if (data->pwm[i] == 255 && mode == 0)
-			data->pwm_enable[i] = 0;
-		else
-			data->pwm_enable[i] = mode + 1;
+		data->pwm_enable[i] = reg_to_pwm_enable(data->pwm[i],
+							(fanmodecfg >> 4) & 7);
+
 		data->tolerance[i][0] = fanmodecfg & 0x0f;
 		if (sio_data->kind == nct6779) {
 			tol = nct6775_read_value(data,
@@ -721,16 +732,6 @@ static void nct6775_update_pwm_limits(struct device *dev)
 		  nct6775_read_value(data, NCT6775_REG_FAN_STEP_UP_TIME[i]);
 		data->fan_step_down_time[i] =
 		  nct6775_read_value(data, NCT6775_REG_FAN_STEP_DOWN_TIME[i]);
-
-		if (data->REG_FAN_MAX_OUTPUT)
-			data->fan_max_output[i] =
-			  nct6775_read_value(data,
-					data->REG_FAN_MAX_OUTPUT[i]);
-
-		if (data->REG_FAN_STEP_OUTPUT)
-			data->fan_step_output[i] =
-			  nct6775_read_value(data,
-					     data->REG_FAN_STEP_OUTPUT[i]);
 
 		data->target_temp[i] =
 			nct6775_read_value(data,
@@ -1568,7 +1569,6 @@ store_pwm_enable(struct device *dev, struct device_attribute *attr,
 			const char *buf, size_t count)
 {
 	struct nct6775_data *data = dev_get_drvdata(dev);
-	struct nct6775_sio_data *sio_data = dev->platform_data;
 	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
 	int nr = sensor_attr->index;
 	unsigned long val;
@@ -1579,14 +1579,10 @@ store_pwm_enable(struct device *dev, struct device_attribute *attr,
 	if (err < 0)
 		return err;
 
-	if (val > 5)
+	if (val > 4)
 		return -EINVAL;
 
-	/* SmartFan III mode is only supported on NCT6775F */
-	if (sio_data->kind != nct6775 && val == 4)
-		return -EINVAL;
-
-	if (val == 5 && check_trip_points(data, nr)) {
+	if (val == 4 && check_trip_points(data, nr)) {
 		dev_err(dev, "Inconsistent trip points, not switching to SmartFan IV mode\n");
 		dev_err(dev, "Adjust trip points and try again\n");
 		return -EINVAL;
@@ -1598,13 +1594,12 @@ store_pwm_enable(struct device *dev, struct device_attribute *attr,
 		/*
 		 * turn off pwm control: select manual mode, set pwm to maximum
 		 */
-		val = 1;
 		data->pwm[nr] = 255;
 		nct6775_write_value(data, NCT6775_REG_PWM[nr], 255);
 	}
 	reg = nct6775_read_value(data, NCT6775_REG_FAN_MODE[nr]);
 	reg &= 0x0f;
-	reg |= (val - 1) << 4;
+	reg |= (pwm_enable_to_reg(val) << 4);
 	nct6775_write_value(data, NCT6775_REG_FAN_MODE[nr], reg);
 	mutex_unlock(&data->update_lock);
 	return count;
@@ -1780,8 +1775,6 @@ store_##reg(struct device *dev, struct device_attribute *attr, \
 
 fan_functions(fan_start_output, FAN_START_OUTPUT)
 fan_functions(fan_stop_output, FAN_STOP_OUTPUT)
-fan_functions(fan_max_output, FAN_MAX_OUTPUT)
-fan_functions(fan_step_output, FAN_STEP_OUTPUT)
 
 #define fan_step_functions(reg, REG) \
 static ssize_t show_##reg(struct device *dev, \
@@ -1953,33 +1946,6 @@ static const struct attribute_group nct6775_group_pwm[5] = {
 	{ .attrs = nct6775_attributes_pwm[2] },
 	{ .attrs = nct6775_attributes_pwm[3] },
 	{ .attrs = nct6775_attributes_pwm[4] },
-};
-
-/*
- * max and step settings are not supported on all chips.
- * Need to check support while generating/removing attribute files.
- */
-static struct sensor_device_attribute sda_sf3_max_step_arrays[] = {
-	SENSOR_ATTR(pwm1_max_output, S_IWUSR | S_IRUGO, show_fan_max_output,
-		    store_fan_max_output, 0),
-	SENSOR_ATTR(pwm1_step_output, S_IWUSR | S_IRUGO, show_fan_step_output,
-		    store_fan_step_output, 0),
-	SENSOR_ATTR(pwm2_max_output, S_IWUSR | S_IRUGO, show_fan_max_output,
-		    store_fan_max_output, 1),
-	SENSOR_ATTR(pwm2_step_output, S_IWUSR | S_IRUGO, show_fan_step_output,
-		    store_fan_step_output, 1),
-	SENSOR_ATTR(pwm3_max_output, S_IWUSR | S_IRUGO, show_fan_max_output,
-		    store_fan_max_output, 2),
-	SENSOR_ATTR(pwm3_step_output, S_IWUSR | S_IRUGO, show_fan_step_output,
-		    store_fan_step_output, 2),
-	SENSOR_ATTR(pwm4_max_output, S_IWUSR | S_IRUGO, show_fan_max_output,
-		    store_fan_max_output, 3),
-	SENSOR_ATTR(pwm4_step_output, S_IWUSR | S_IRUGO, show_fan_step_output,
-		    store_fan_step_output, 3),
-	SENSOR_ATTR(pwm5_max_output, S_IWUSR | S_IRUGO, show_fan_max_output,
-		    store_fan_max_output, 4),
-	SENSOR_ATTR(pwm5_step_output, S_IWUSR | S_IRUGO, show_fan_step_output,
-		    store_fan_step_output, 4),
 };
 
 static ssize_t show_auto_pwm(struct device *dev, struct device_attribute *attr,
@@ -2391,9 +2357,6 @@ static void nct6775_device_remove_files(struct device *dev)
 					   &sda_auto_pwm_arrays[j].dev_attr);
 	}
 
-	for (i = 0; i < ARRAY_SIZE(sda_sf3_max_step_arrays); i++)
-		device_remove_file(dev, &sda_sf3_max_step_arrays[i].dev_attr);
-
 	for (i = 0; i < data->in_num; i++)
 		sysfs_remove_group(&dev->kobj, &nct6775_group_in[i]);
 
@@ -2790,8 +2753,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_FAN_MIN = NCT6775_REG_FAN_MIN;
 		data->REG_FAN_START_OUTPUT = NCT6775_REG_FAN_START_OUTPUT;
 		data->REG_FAN_STOP_OUTPUT = NCT6775_REG_FAN_STOP_OUTPUT;
-		data->REG_FAN_MAX_OUTPUT = NCT6775_REG_FAN_MAX_OUTPUT;
-		data->REG_FAN_STEP_OUTPUT = NCT6775_REG_FAN_STEP_OUTPUT;
 	} else if (sio_data->kind == nct6776) {
 		data->has_fan_div = false;
 		data->fan_from_reg = fan_from_reg13;
@@ -2869,18 +2830,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		err = device_create_file(dev, &attr->dev_attr);
 		if (err)
 			goto exit_remove;
-	}
-
-	if (data->REG_FAN_STEP_OUTPUT) {
-		for (i = 0; i < ARRAY_SIZE(sda_sf3_max_step_arrays); i++) {
-			struct sensor_device_attribute *attr =
-				&sda_sf3_max_step_arrays[i];
-			if (!(data->has_pwm & (1 << attr->index)))
-				continue;
-			err = device_create_file(dev, &attr->dev_attr);
-			if (err)
-				goto exit_remove;
-		}
 	}
 
 	for (i = 0; i < data->in_num; i++) {
