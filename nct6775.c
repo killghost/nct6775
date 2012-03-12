@@ -35,7 +35,7 @@
  * Chip        #vin    #fan    #pwm    #temp  chip IDs       man ID
  * nct6775f     9      4       3       9      0xb470 0xc1    0x5ca3
  * nct6776f     9      5       3       9      0xc330 0xc1    0x5ca3
- * nct6779d    15      5       5       8      0xc560 0xc1    0x5ca3
+ * nct6779d    15      5       5       7      0xc560 0xc1    0x5ca3
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -493,9 +493,9 @@ struct nct6775_data {
 	u8 has_fan_min;		/* some fans don't have min register */
 	bool has_fan_div;
 	u8 temp_type[3];
-	s16 temp[9];
-	s16 temp_max[9];
-	s16 temp_max_hyst[9];
+	s16 temp[11];
+	s16 temp_max[6];
+	s16 temp_max_hyst[6];
 	u32 alarms;
 	u8 caseopen;
 
