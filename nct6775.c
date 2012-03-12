@@ -202,10 +202,10 @@ static const u16 NCT6775_REG_FAN_STEP_UP_TIME[] = {
 	0x104, 0x204, 0x304, 0x804, 0x904 };
 static const u16 NCT6775_REG_FAN_STOP_OUTPUT[] = {
 	0x105, 0x205, 0x305, 0x805, 0x905 };
-static const u16 NCT6775_REG_FAN_START_OUTPUT[] = {
-	0x106, 0x206, 0x306, 0x806, 0x906 };
-static const u16 NCT6775_REG_FAN_STOP_TIME[] = {
-	0x107, 0x207, 0x307, 0x807, 0x907 };
+static const u16 NCT6775_REG_FAN_START_OUTPUT[]
+	= { 0x106, 0x206, 0x306, 0x806, 0x906 };
+static const u16 NCT6775_REG_FAN_STOP_TIME[]
+	= { 0x107, 0x207, 0x307, 0x807, 0x907 };
 static const u16 NCT6775_REG_PWM[] = { 0x109, 0x209, 0x309, 0x809, 0x909 };
 static const u16 NCT6775_REG_PWM_READ[] = { 0x01, 0x03, 0x11, 0x13, 0x15 };
 
@@ -213,38 +213,31 @@ static const u16 NCT6775_REG_FAN[] = { 0x630, 0x632, 0x634, 0x636, 0x638 };
 
 static const u16 NCT6776_REG_FAN_MIN[] = { 0x63a, 0x63c, 0x63e, 0x640, 0x642};
 
-static const u16 NCT6779_REG_TOLERANCE_H[] = {
-	0x10c, 0x20c, 0x30c, 0x40c, 0x50c };
+static const u16 NCT6779_REG_TOLERANCE_H[]
+	= { 0x10c, 0x20c, 0x30c, 0x40c, 0x50c };
 
 static const u16 NCT6779_REG_FAN[] = { 0x4c0, 0x4c2, 0x4c4, 0x4c6, 0x4c8 };
 
-static const u16 NCT6775_REG_TEMP[]
-	= { 0x27, 0x150, 0x250, 0x73, 0x75, 0x77, 0x62b, 0x62c, 0x62d };
-static const u16 NCT6775_REG_TEMP_CONFIG[]
-	= { 0, 0x152, 0x252, 0, 0, 0, 0x628, 0x629, 0x62A };
-static const u16 NCT6775_REG_TEMP_HYST[]
-	= { 0x3a, 0x153, 0x253, 0, 0, 0, 0x673, 0x678, 0x67D };
-static const u16 NCT6775_REG_TEMP_OVER[]
-	= { 0x39, 0x155, 0x255, 0, 0, 0, 0x672, 0x677, 0x67C };
-static const u16 NCT6775_REG_TEMP_SOURCE[]
-	= { 0x621, 0x622, 0x623, 0x100, 0x200, 0x300, 0x624, 0x625, 0x626 };
+static const u16 NCT6775_REG_TEMP[11]
+	= { 0x27, 0x150, 0x250, 0x62b, 0x62c, 0x62d, 0x73, 0x75, 0x77 };
+static const u16 NCT6775_REG_TEMP_CONFIG[11]
+	= { 0, 0x152, 0x252, 0x628, 0x629, 0x62A };
+static const u16 NCT6775_REG_TEMP_HYST[11]
+	= { 0x3a, 0x153, 0x253, 0x673, 0x678, 0x67D };
+static const u16 NCT6775_REG_TEMP_OVER[11]
+	= { 0x39, 0x155, 0x255, 0x672, 0x677, 0x67C };
+static const u16 NCT6775_REG_TEMP_SOURCE[11]
+	= { 0x621, 0x622, 0x623, 0x624, 0x625, 0x626, 0x100, 0x200, 0x300,
+	    0x800, 0x900 };
 
-static const u16 NCT6776_REG_TEMP_CONFIG[]
-	= { 0x18, 0x152, 0x252, 0, 0, 0, 0x628, 0x629, 0x62A };
+static const u16 NCT6776_REG_TEMP_CONFIG[11]
+	= { 0x18, 0x152, 0x252, 0x628, 0x629, 0x62A };
 
-static const u16 NCT6779_REG_TEMP[]
-	= { 0x27, 0x150, 0x73, 0x75, 0x77, 0x79, 0x7b };
-static const u16 NCT6779_REG_TEMP_CONFIG[]
-	= { 0x18, 0x152, 0, 0, 0, 0, 0 };
-static const u16 NCT6779_REG_TEMP_SOURCE[]
-	= { 0x621, 0x622, 0x100, 0x200, 0x300, 0x800, 0x900 };
-static const u16 NCT6779_REG_TEMP_HYST[]
-	= { 0x3a, 0x153, 0, 0, 0, 0, 0, 0, 0 };
-static const u16 NCT6779_REG_TEMP_OVER[]
-	= { 0x39, 0x155, 0, 0, 0, 0, 0, 0, 0 };
+static const u16 NCT6779_REG_TEMP[11]
+	= { 0x27, 0x150, 0, 0, 0, 0, 0x73, 0x75, 0x77, 0x79, 0x7b };
 
-static const u16 NCT6775_REG_AUTO_BASE[] = {
-	0x100, 0x200, 0x300, 0x800, 0x900 };
+static const u16 NCT6775_REG_AUTO_BASE[]
+	= { 0x100, 0x200, 0x300, 0x800, 0x900 };
 
 #define NCT6775_REG_AUTO_TEMP(nr, p)	(NCT6775_REG_AUTO_BASE[nr] + 0x21 + (p))
 #define NCT6775_REG_AUTO_PWM(nr, p)	(NCT6775_REG_AUTO_BASE[nr] + 0x27 + (p))
@@ -1380,6 +1373,8 @@ static struct sensor_device_attribute sda_temp_input[] = {
 	SENSOR_ATTR(temp7_input, S_IRUGO, show_temp, NULL, 6),
 	SENSOR_ATTR(temp8_input, S_IRUGO, show_temp, NULL, 7),
 	SENSOR_ATTR(temp9_input, S_IRUGO, show_temp, NULL, 8),
+	SENSOR_ATTR(temp10_input, S_IRUGO, show_temp, NULL, 9),
+	SENSOR_ATTR(temp11_input, S_IRUGO, show_temp, NULL, 10),
 };
 
 static struct sensor_device_attribute sda_temp_label[] = {
@@ -1389,9 +1384,6 @@ static struct sensor_device_attribute sda_temp_label[] = {
 	SENSOR_ATTR(temp4_label, S_IRUGO, show_temp_label, NULL, 3),
 	SENSOR_ATTR(temp5_label, S_IRUGO, show_temp_label, NULL, 4),
 	SENSOR_ATTR(temp6_label, S_IRUGO, show_temp_label, NULL, 5),
-	SENSOR_ATTR(temp7_label, S_IRUGO, show_temp_label, NULL, 6),
-	SENSOR_ATTR(temp8_label, S_IRUGO, show_temp_label, NULL, 7),
-	SENSOR_ATTR(temp9_label, S_IRUGO, show_temp_label, NULL, 8),
 };
 
 static struct sensor_device_attribute sda_temp_max[] = {
@@ -1407,12 +1399,6 @@ static struct sensor_device_attribute sda_temp_max[] = {
 		    store_temp_max, 4),
 	SENSOR_ATTR(temp6_max, S_IRUGO | S_IWUSR, show_temp_max,
 		    store_temp_max, 5),
-	SENSOR_ATTR(temp7_max, S_IRUGO | S_IWUSR, show_temp_max,
-		    store_temp_max, 6),
-	SENSOR_ATTR(temp8_max, S_IRUGO | S_IWUSR, show_temp_max,
-		    store_temp_max, 7),
-	SENSOR_ATTR(temp9_max, S_IRUGO | S_IWUSR, show_temp_max,
-		    store_temp_max, 8),
 };
 
 static struct sensor_device_attribute sda_temp_max_hyst[] = {
@@ -1428,12 +1414,6 @@ static struct sensor_device_attribute sda_temp_max_hyst[] = {
 		    store_temp_max_hyst, 4),
 	SENSOR_ATTR(temp6_max_hyst, S_IRUGO | S_IWUSR, show_temp_max_hyst,
 		    store_temp_max_hyst, 5),
-	SENSOR_ATTR(temp7_max_hyst, S_IRUGO | S_IWUSR, show_temp_max_hyst,
-		    store_temp_max_hyst, 6),
-	SENSOR_ATTR(temp8_max_hyst, S_IRUGO | S_IWUSR, show_temp_max_hyst,
-		    store_temp_max_hyst, 7),
-	SENSOR_ATTR(temp9_max_hyst, S_IRUGO | S_IWUSR, show_temp_max_hyst,
-		    store_temp_max_hyst, 8),
 };
 
 static struct sensor_device_attribute sda_temp_alarm[] = {
@@ -2370,6 +2350,8 @@ static void nct6775_device_remove_files(struct device *dev)
 		if (!(data->have_temp & (1 << i)))
 			continue;
 		device_remove_file(dev, &sda_temp_input[i].dev_attr);
+		if (i > 5)
+			continue;
 		device_remove_file(dev, &sda_temp_label[i].dev_attr);
 		device_remove_file(dev, &sda_temp_max[i].dev_attr);
 		device_remove_file(dev, &sda_temp_max_hyst[i].dev_attr);
@@ -2546,6 +2528,8 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 	struct nct6775_data *data;
 	struct resource *res;
 	int i, err = 0;
+	int mask = 0;
+	const u16 *reg_temp, *reg_temp_config;
 
 	res = platform_get_resource(pdev, IORESOURCE_IO, 0);
 	if (!request_region(res->start, IOREGION_LENGTH, DRVNAME)) {
@@ -2599,127 +2583,95 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 	data->have_temp = 0;
 
 	/* Deal with temperature register setup first. */
-	if (sio_data->kind == nct6775 || sio_data->kind == nct6776) {
-		int mask = 0;
+	switch(sio_data->kind == nct6775) {
+	case nct6775:
+		reg_temp = NCT6775_REG_TEMP;
+		reg_temp_config = NCT6775_REG_TEMP_CONFIG;
+	case nct6776:
+		reg_temp = NCT6775_REG_TEMP;
+		reg_temp_config = NCT6776_REG_TEMP_CONFIG;
+		break;
+	case nct6779:
+		reg_temp = NCT6779_REG_TEMP;
+		reg_temp_config = NCT6776_REG_TEMP_CONFIG;
+		break;
+	}
 
+	for (i = 0; i < NUM_REG_TEMP; i++) {
+		u8 src;
+
+		if (reg_temp[i] == 0)
+			continue;
+
+		data->reg_temp[i] = reg_temp[i];
+		data->reg_temp_over[i] = NCT6775_REG_TEMP_OVER[i];
+		data->reg_temp_hyst[i] = NCT6775_REG_TEMP_HYST[i];
+		data->reg_temp_config[i] = reg_temp_config[i];
+
+		src = nct6775_read_value(data, NCT6775_REG_TEMP_SOURCE[i]);
+		src &= 0x1f;
+
+		/* Always display temp6..10 (fan control sources) if enabled */
+		if (src && (i > 5 || !(mask & (1 << src)))) {
+			data->have_temp |= 1 << i;
+			mask |= 1 << src;
+		}
+
+		data->temp_src[i] = src;
+
+		if (i < 6) {
+			/*
+			 * Do some register swapping if index 0..2 don't
+			 * point to SYSTIN(1), CPUIN(2), and AUXIN(3).
+			 * Idea is to have the first three attributes
+			 * report SYSTIN, CPUIN, and AUXIN if possible
+			 * without overriding the basic system configuration.
+			 * Do this only for the first six temperature sources;
+			 * the remaining temperatures are fan control sources,
+			 * and we don't want to touch those.
+			 */
+			if (i > 0 && data->temp_src[0] != 1
+			    && data->temp_src[i] == 1)
+				w82627ehf_swap_tempreg(data, 0, i);
+			if (i > 1 && data->temp_src[1] != 2
+			    && data->temp_src[i] == 2)
+				w82627ehf_swap_tempreg(data, 1, i);
+			if (i > 2 && data->temp_src[2] != 3
+			    && data->temp_src[i] == 3)
+				w82627ehf_swap_tempreg(data, 2, i);
+		}
+	}
+
+	switch (sio_data->kind) {
+	case nct6775:
+		data->temp_label = nct6775_temp_label;
+		break;
+	case nct6776:
 		/*
-		 * Display temperature sensor output only if it monitors
-		 * a source other than one already reported. Always display
-		 * first three temperature registers, though.
+		 * On NCT6776, AUXTIN and VIN3 pins are shared.
+		 * Only way to detect it is to check if AUXTIN is used
+		 * as a temperature source, and if that source is
+		 * enabled.
+		 *
+		 * If that is the case, disable in6, which reports VIN3.
+		 * Otherwise disable temp3.
 		 */
-		for (i = 0; i < NUM_REG_TEMP; i++) {
-			u8 src;
+		if (data->temp_src[2] == 3) {
+			u8 reg;
 
-			data->reg_temp[i] = NCT6775_REG_TEMP[i];
-			data->reg_temp_over[i] = NCT6775_REG_TEMP_OVER[i];
-			data->reg_temp_hyst[i] = NCT6775_REG_TEMP_HYST[i];
-			if (sio_data->kind == nct6775)
-				data->reg_temp_config[i]
-				  = NCT6775_REG_TEMP_CONFIG[i];
+			if (data->reg_temp_config[2])
+				reg = nct6775_read_value(data,
+					data->reg_temp_config[2]);
 			else
-				data->reg_temp_config[i]
-				  = NCT6776_REG_TEMP_CONFIG[i];
+				reg = 0; /* Assume AUXTIN is used */
 
-			src = nct6775_read_value(data,
-						 NCT6775_REG_TEMP_SOURCE[i]);
-			src &= 0x1f;
-			if (src && !(mask & (1 << src))) {
-				data->have_temp |= 1 << i;
-				mask |= 1 << src;
-			}
-
-			data->temp_src[i] = src;
-
-			/*
-			 * Now do some register swapping if index 0..2 don't
-			 * point to SYSTIN(1), CPUIN(2), and AUXIN(3).
-			 * Idea is to have the first three attributes
-			 * report SYSTIN, CPUIN, and AUXIN if possible
-			 * without overriding the basic system configuration.
-			 */
-			if (i > 0 && data->temp_src[0] != 1
-			    && data->temp_src[i] == 1)
-				w82627ehf_swap_tempreg(data, 0, i);
-			if (i > 1 && data->temp_src[1] != 2
-			    && data->temp_src[i] == 2)
-				w82627ehf_swap_tempreg(data, 1, i);
-			if (i > 2 && data->temp_src[2] != 3
-			    && data->temp_src[i] == 3)
-				w82627ehf_swap_tempreg(data, 2, i);
+			if (reg & 0x01)
+				data->have_temp &= ~(1 << 2);
+			else
+				data->have_in &= ~(1 << 6);
 		}
-		if (sio_data->kind == nct6776) {
-			/*
-			 * On NCT6776, AUXTIN and VIN3 pins are shared.
-			 * Only way to detect it is to check if AUXTIN is used
-			 * as a temperature source, and if that source is
-			 * enabled.
-			 *
-			 * If that is the case, disable in6, which reports VIN3.
-			 * Otherwise disable temp3.
-			 */
-			if (data->temp_src[2] == 3) {
-				u8 reg;
-
-				if (data->reg_temp_config[2])
-					reg = nct6775_read_value(data,
-						data->reg_temp_config[2]);
-				else
-					reg = 0; /* Assume AUXTIN is used */
-
-				if (reg & 0x01)
-					data->have_temp &= ~(1 << 2);
-				else
-					data->have_in &= ~(1 << 6);
-			}
-			data->temp_label = nct6776_temp_label;
-		} else {
-			data->temp_label = nct6775_temp_label;
-		}
-	} else if (sio_data->kind == nct6779) {
-		int mask = 0;
-
-		/*
-		 * Display temperature sensor output only if it monitors
-		 * a source other than one already reported. Always display
-		 * first three temperature registers, though.
-		 */
-		for (i = 0; i < ARRAY_SIZE(NCT6779_REG_TEMP); i++) {
-			u8 src;
-
-			data->reg_temp[i] = NCT6779_REG_TEMP[i];
-			data->reg_temp_over[i] = NCT6779_REG_TEMP_OVER[i];
-			data->reg_temp_hyst[i] = NCT6779_REG_TEMP_HYST[i];
-			data->reg_temp_config[i] = NCT6779_REG_TEMP_CONFIG[i];
-
-			src = nct6775_read_value(data,
-						 NCT6779_REG_TEMP_SOURCE[i]);
-			src &= 0x1f;
-			if (src && !(mask & (1 << src))) {
-				data->have_temp |= 1 << i;
-				mask |= 1 << src;
-			}
-
-			data->temp_src[i] = src;
-
-			/*
-			 * Now do some register swapping if index 0..2 don't
-			 * point to SYSTIN(1), CPUIN(2), and AUXIN(3).
-			 * Idea is to have the first three attributes
-			 * report SYSTIN, CPUIN, and AUXIN if possible
-			 * without overriding the basic system configuration.
-			 */
-			if (i > 0 && data->temp_src[0] != 1
-			    && data->temp_src[i] == 1)
-				w82627ehf_swap_tempreg(data, 0, i);
-			if (i > 1 && data->temp_src[1] != 2
-			    && data->temp_src[i] == 2)
-				w82627ehf_swap_tempreg(data, 1, i);
-			if (i > 2 && data->temp_src[2] != 3
-			    && data->temp_src[i] == 3)
-				w82627ehf_swap_tempreg(data, 2, i);
-		}
-		data->temp_label = nct6779_temp_label;
-
+		data->temp_label = nct6776_temp_label;
+	case nct6779:
 		/*
 		 * Shared pins:
 		 *	VIN4 / AUXTIN0
@@ -2741,6 +2693,8 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 			if (data->temp_src[i] == 6)		/* AUXTIN0 */
 				data->have_in &= ~(1 << 14);	/* no VIN7 */
 		}
+		data->temp_label = nct6779_temp_label;
+		break;
 	}
 
 	if (sio_data->kind == nct6775) {
@@ -2872,6 +2826,8 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		err = device_create_file(dev, &sda_temp_input[i].dev_attr);
 		if (err)
 			goto exit_remove;
+		if (i > 5)
+			continue;
 		if (data->temp_label) {
 			err = device_create_file(dev,
 						 &sda_temp_label[i].dev_attr);
