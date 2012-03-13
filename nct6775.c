@@ -238,7 +238,7 @@ static const u16 NCT6776_REG_TEMP_CONFIG[11]
 static const u16 NCT6779_REG_TEMP[11]
 	= { 0x27, 0x150, 0, 0, 0, 0, 0x73, 0x75, 0x77, 0x79, 0x7b };
 
-static const u16 NCT6779_REG_TEMP_SOURCE_2[11]
+static const u16 NCT6775_REG_TEMP_SOURCE_2[11]
 	= { 0, 0, 0, 0, 0, 0, 0x139, 0x239, 0x339, 0x839, 0x939 };
 
 static const u16 NCT6775_REG_AUTO_TEMP[]
@@ -2695,6 +2695,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		  = NCT6775_REG_CRITICAL_TEMP_TOLERANCE;
 		data->REG_TEMP_OFFSET = NCT6775_REG_TEMP_OFFSET;
 		data->REG_TEMP_SOURCE = NCT6775_REG_TEMP_SOURCE;
+		data->REG_TEMP_SOURCE_2 = NCT6775_REG_TEMP_SOURCE_2;
 		data->REG_ALARM = NCT6775_REG_ALARM;
 		data->REG_CASEOPEN = NCT6775_REG_CASEOPEN;
 		data->CASEOPEN_MASK = NCT6775_CASEOPEN_MASK;
@@ -2736,6 +2737,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		  = NCT6775_REG_CRITICAL_TEMP_TOLERANCE;
 		data->REG_TEMP_OFFSET = NCT6775_REG_TEMP_OFFSET;
 		data->REG_TEMP_SOURCE = NCT6775_REG_TEMP_SOURCE;
+		data->REG_TEMP_SOURCE_2 = NCT6775_REG_TEMP_SOURCE_2;
 		data->REG_ALARM = NCT6775_REG_ALARM;
 		data->REG_CASEOPEN = NCT6775_REG_CASEOPEN;
 		data->CASEOPEN_MASK = NCT6776_CASEOPEN_MASK;
@@ -2779,7 +2781,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		  = NCT6775_REG_CRITICAL_TEMP_TOLERANCE;
 		data->REG_TEMP_OFFSET = NCT6775_REG_TEMP_OFFSET;
 		data->REG_TEMP_SOURCE = NCT6775_REG_TEMP_SOURCE;
-		data->REG_TEMP_SOURCE_2 = NCT6779_REG_TEMP_SOURCE_2;
+		data->REG_TEMP_SOURCE_2 = NCT6775_REG_TEMP_SOURCE_2;
 		data->REG_ALARM = NCT6779_REG_ALARM;
 		data->REG_CASEOPEN = NCT6775_REG_CASEOPEN;
 		data->CASEOPEN_MASK = NCT6776_CASEOPEN_MASK;
@@ -2818,6 +2820,12 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 
 		data->temp_src[0][i] = src;
 
+		if (data->REG_TEMP_SOURCE_2[i]) {
+			src = nct6775_read_value(data,
+						 data->REG_TEMP_SOURCE_2[i]);
+			data->temp_src[1][i] = src & 0x1f;
+		}
+
 		if (i < 6) {
 			/*
 			 * Do some register swapping if index 0..2 don't
@@ -2839,11 +2847,11 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 			    && data->temp_src[0][i] == 3)
 				w82627ehf_swap_tempreg(data, 2, i);
 		}
-		data->have_temp_offset = data->have_temp & 0x07;
-		for (i = 0; i < 3; i++) {
-			if (data->temp_src[0][i] > 3)
-				data->have_temp_offset &= ~(1 << i);
-		}
+	}
+	data->have_temp_offset = data->have_temp & 0x07;
+	for (i = 0; i < 3; i++) {
+		if (data->temp_src[0][i] > 3)
+			data->have_temp_offset &= ~(1 << i);
 	}
 
 	switch (data->kind) {
@@ -2897,12 +2905,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 				data->have_in &= ~(1 << 11);	/* no VIN6 */
 			if (data->temp_src[0][i] == 6)		/* AUXTIN0 */
 				data->have_in &= ~(1 << 14);	/* no VIN7 */
-
-			if (NCT6779_REG_TEMP_SOURCE_2[i]) {
-				src = nct6775_read_value(data,
-						NCT6779_REG_TEMP_SOURCE_2[i]);
-				data->temp_src[1][i] = src & 0x1f;
-			}
 		}
 		data->temp_label = nct6779_temp_label;
 		break;
