@@ -230,6 +230,7 @@ static const u16 NCT6775_REG_TEMP_OVER[11]
 static const u16 NCT6775_REG_TEMP_SOURCE[11]
 	= { 0x621, 0x622, 0x623, 0x624, 0x625, 0x626, 0x100, 0x200, 0x300,
 	    0x800, 0x900 };
+static const u16 NCT6775_REG_TEMP_OFFSET[] = { 0x454, 0x455, 0x456 };
 
 static const u16 NCT6776_REG_TEMP_CONFIG[11]
 	= { 0x18, 0x152, 0x252, 0x628, 0x629, 0x62A };
@@ -477,6 +478,8 @@ struct nct6775_data {
 	const u16 *REG_TEMP_SOURCE;
 	const u16 *REG_TEMP_SOURCE_2;
 
+	const u16 *REG_TEMP_OFFSET;
+
 	const u16 *REG_ALARM;
 
 	u8 REG_CASEOPEN;
@@ -501,6 +504,7 @@ struct nct6775_data {
 	u8 has_fan_min;		/* some fans don't have min register */
 	bool has_fan_div;
 	u8 temp_type[3];
+	s8 temp_offset[3];
 	s16 temp[3][11];	/* 0=temp, 1=temp_over, 2=temp_hyst */
 	u64 alarms;
 	u8 caseopen;
@@ -529,6 +533,7 @@ struct nct6775_data {
 	u8 vrm;
 
 	u16 have_temp;
+	u16 have_temp_offset;
 	u16 have_in;
 };
 
@@ -860,6 +865,10 @@ static struct nct6775_data *nct6775_update_device(struct device *dev)
 					  = nct6775_read_temp(data,
 						data->reg_temp[j][i]);
 			}
+			if (!(data->have_temp_offset & (1 << i)))
+				continue;
+			data->temp_offset[i]
+			  = nct6775_read_value(data, data->REG_TEMP_OFFSET[i]);
 		}
 
 		data->alarms = 0;
@@ -1352,6 +1361,39 @@ store_temp(struct device *dev, struct device_attribute *attr, const char *buf,
 }
 
 static ssize_t
+show_temp_offset(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct nct6775_data *data = nct6775_update_device(dev);
+	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
+
+	return sprintf(buf, "%d\n", data->temp_offset[sensor_attr->index] * 1000);
+}
+
+static ssize_t
+store_temp_offset(struct device *dev, struct device_attribute *attr,
+		  const char *buf, size_t count)
+{
+	struct nct6775_data *data = dev_get_drvdata(dev);
+	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
+	int nr = sensor_attr->index;
+	long val;
+	int err;
+
+	err = kstrtol(buf, 10, &val);
+	if (err < 0)
+		return err;
+
+	val = SENSORS_LIMIT(DIV_ROUND_CLOSEST(val, 1000), -128, 127);
+
+	mutex_lock(&data->update_lock);
+	data->temp_offset[nr] = val;
+	nct6775_write_value(data, data->REG_TEMP_OFFSET[nr], val);
+	mutex_unlock(&data->update_lock);
+
+	return count;
+}
+
+static ssize_t
 show_temp_type(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
@@ -1411,6 +1453,15 @@ static struct sensor_device_attribute_2 sda_temp_max_hyst[] = {
 		      4, 2),
 	SENSOR_ATTR_2(temp6_max_hyst, S_IRUGO | S_IWUSR, show_temp, store_temp,
 		      5, 2),
+};
+
+static struct sensor_device_attribute sda_temp_offset[] = {
+	SENSOR_ATTR(temp1_offset, S_IRUGO | S_IWUSR, show_temp_offset,
+		    store_temp_offset, 0),
+	SENSOR_ATTR(temp2_offset, S_IRUGO | S_IWUSR, show_temp_offset,
+		    store_temp_offset, 1),
+	SENSOR_ATTR(temp3_offset, S_IRUGO | S_IWUSR, show_temp_offset,
+		    store_temp_offset, 2),
 };
 
 static struct sensor_device_attribute sda_temp_alarm[] = {
@@ -2423,6 +2474,7 @@ static void nct6775_device_remove_files(struct device *dev)
 			continue;
 		device_remove_file(dev, &sda_temp_alarm[i].dev_attr);
 		device_remove_file(dev, &sda_temp_type[i].dev_attr);
+		device_remove_file(dev, &sda_temp_offset[i].dev_attr);
 	}
 
 	device_remove_file(dev, &sda_caseopen[0].dev_attr);
@@ -2641,6 +2693,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_CRITICAL_TEMP = NCT6775_REG_CRITICAL_TEMP;
 		data->REG_CRITICAL_TEMP_TOLERANCE
 		  = NCT6775_REG_CRITICAL_TEMP_TOLERANCE;
+		data->REG_TEMP_OFFSET = NCT6775_REG_TEMP_OFFSET;
 		data->REG_TEMP_SOURCE = NCT6775_REG_TEMP_SOURCE;
 		data->REG_ALARM = NCT6775_REG_ALARM;
 		data->REG_CASEOPEN = NCT6775_REG_CASEOPEN;
@@ -2681,6 +2734,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_CRITICAL_TEMP = NCT6775_REG_CRITICAL_TEMP;
 		data->REG_CRITICAL_TEMP_TOLERANCE
 		  = NCT6775_REG_CRITICAL_TEMP_TOLERANCE;
+		data->REG_TEMP_OFFSET = NCT6775_REG_TEMP_OFFSET;
 		data->REG_TEMP_SOURCE = NCT6775_REG_TEMP_SOURCE;
 		data->REG_ALARM = NCT6775_REG_ALARM;
 		data->REG_CASEOPEN = NCT6775_REG_CASEOPEN;
@@ -2723,6 +2777,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_CRITICAL_TEMP = NCT6775_REG_CRITICAL_TEMP;
 		data->REG_CRITICAL_TEMP_TOLERANCE
 		  = NCT6775_REG_CRITICAL_TEMP_TOLERANCE;
+		data->REG_TEMP_OFFSET = NCT6775_REG_TEMP_OFFSET;
 		data->REG_TEMP_SOURCE = NCT6775_REG_TEMP_SOURCE;
 		data->REG_TEMP_SOURCE_2 = NCT6779_REG_TEMP_SOURCE_2;
 		data->REG_ALARM = NCT6779_REG_ALARM;
@@ -2783,6 +2838,11 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 			if (i > 2 && data->temp_src[0][2] != 3
 			    && data->temp_src[0][i] == 3)
 				w82627ehf_swap_tempreg(data, 2, i);
+		}
+		data->have_temp_offset = data->have_temp & 0x07;
+		for (i = 0; i < 3; i++) {
+			if (data->temp_src[0][i] > 3)
+				data->have_temp_offset &= ~(1 << i);
 		}
 	}
 
@@ -2981,6 +3041,12 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		err = device_create_file(dev, &sda_temp_type[i].dev_attr);
 		if (err)
 			goto exit_remove;
+		if (data->have_temp_offset & (1 << i)) {
+			err = device_create_file(dev,
+						 &sda_temp_offset[i].dev_attr);
+			if (err)
+				goto exit_remove;
+		}
 	}
 
 	for (i = 0; i < ARRAY_SIZE(sda_caseopen); i++) {
