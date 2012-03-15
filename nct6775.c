@@ -223,6 +223,9 @@ static const u16 NCT6779_REG_FAN[] = { 0x4c0, 0x4c2, 0x4c4, 0x4c6, 0x4c8 };
 static const u16 NCT6775_REG_TEMP[]
 	= { 0x27, 0x150, 0x250, 0x62b, 0x62c, 0x62d };
 static const u16 NCT6779_REG_TEMP[] = { 0x27, 0x150 };
+static const u16 NCT6779_REG_TEMP_FIXED[]
+	= { 0x490, 0x491, 0x492, 0x493, 0x494, 0x495};
+
 static const u16 NCT6775_REG_TEMP_CONFIG[]
 	= { 0, 0x152, 0x252, 0x628, 0x629, 0x62A };
 static const u16 NCT6775_REG_TEMP_HYST[]
@@ -495,6 +498,7 @@ struct nct6775_data {
 	const u16 *REG_PWM[3];
 	const u16 *REG_PWM_READ;
 
+	const u16 *REG_TEMP_FIXED;
 	const u16 *REG_TEMP_MON;
 	const u16 *REG_AUTO_TEMP;
 	const u16 *REG_AUTO_PWM;
@@ -3149,6 +3153,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_PWM_READ = NCT6775_REG_PWM_READ;
 		data->REG_PWM_MODE = NCT6776_REG_PWM_MODE;
 		data->PWM_MODE_MASK = NCT6776_PWM_MODE_MASK;
+		data->REG_TEMP_FIXED = NCT6779_REG_TEMP_FIXED;
 		data->REG_TEMP_MON = NCT6775_REG_TEMP_MON;
 		data->REG_AUTO_TEMP = NCT6775_REG_AUTO_TEMP;
 		data->REG_AUTO_PWM = NCT6775_REG_AUTO_PWM;
@@ -3223,6 +3228,18 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		s++;
 	}
 
+	if (data->REG_TEMP_FIXED) {
+		for (i = 0; i < NUM_TEMP_FIXED; i++) {
+			if (data->have_temp & (1 << i))
+				continue;
+			if (!data->REG_TEMP_FIXED[i])
+				continue;
+			data->have_temp |= (1 << i);
+			data->reg_temp[0][i] = data->REG_TEMP_FIXED[i];
+			data->temp_src[i] = i + 1;
+		}
+	}
+
 	switch (data->kind) {
 	case nct6775:
 		data->temp_label = nct6775_temp_label;
@@ -3237,15 +3254,9 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		 * If that is the case, disable in6, which reports VIN3.
 		 * Otherwise disable temp3.
 		 */
-		if (data->temp_src[2] == 3) {
-			u8 reg;
-
-			if (data->reg_temp_config[2])
-				reg = nct6775_read_value(data,
-					data->reg_temp_config[2]);
-			else
-				reg = 0; /* Assume AUXTIN is used */
-
+		if (data->have_temp & (1 << 2)) {
+			u8 reg = nct6775_read_value(data,
+						    data->reg_temp_config[2]);
 			if (reg & 0x01)
 				data->have_temp &= ~(1 << 2);
 			else
@@ -3266,13 +3277,13 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		for (i = 0; i < ARRAY_SIZE(NCT6779_REG_TEMP); i++) {
 			if (!(data->have_temp & (1 << i)))
 				continue;
-			if (data->temp_src[i] == 3)		/* AUXTIN0 */
+			if (i == 2)				/* AUXTIN0 */
 				data->have_in &= ~(1 << 6);	/* no VIN4 */
-			if (data->temp_src[i] == 4)		/* AUXTIN1 */
+			if (i == 3)				/* AUXTIN1 */
 				data->have_in &= ~(1 << 10);	/* no VIN5 */
-			if (data->temp_src[i] == 5)		/* AUXTIN2 */
+			if (i == 4)				/* AUXTIN2 */
 				data->have_in &= ~(1 << 11);	/* no VIN6 */
-			if (data->temp_src[i] == 6)		/* AUXTIN0 */
+			if (i == 5)				/* AUXTIN3 */
 				data->have_in &= ~(1 << 14);	/* no VIN7 */
 		}
 		data->temp_label = nct6779_temp_label;
