@@ -469,6 +469,8 @@ struct nct6775_data {
 	u16 reg_temp_config[NUM_REG_TEMP];
 	const char * const *temp_label;
 
+	u16 REG_VBAT;
+
 	const u16 *REG_VIN;
 	const u16 *REG_IN_MINMAX[2];
 
@@ -2784,9 +2786,9 @@ static inline void __devinit nct6775_init_device(struct nct6775_data *data)
 	}
 
 	/* Enable VBAT monitoring if needed */
-	tmp = nct6775_read_value(data, NCT6775_REG_VBAT);
+	tmp = nct6775_read_value(data, data->REG_VBAT);
 	if (!(tmp & 0x01))
-		nct6775_write_value(data, NCT6775_REG_VBAT, tmp | 0x01);
+		nct6775_write_value(data, data->REG_VBAT, tmp | 0x01);
 
 	for (i = 0; i < 3; i++) {
 		const char *label = NULL;
@@ -2947,6 +2949,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->fan_from_reg = fan_from_reg16;
 		data->fan_from_reg_min = fan_from_reg8;
 
+		data->REG_VBAT = NCT6775_REG_VBAT;
 		data->REG_VIN = NCT6775_REG_IN;
 		data->REG_IN_MINMAX[0] = NCT6775_REG_IN_MIN;
 		data->REG_IN_MINMAX[1] = NCT6775_REG_IN_MAX;
@@ -2995,6 +2998,8 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->has_fan_div = false;
 		data->fan_from_reg = fan_from_reg13;
 		data->fan_from_reg_min = fan_from_reg13;
+
+		data->REG_VBAT = NCT6775_REG_VBAT;
 		data->REG_VIN = NCT6775_REG_IN;
 		data->REG_IN_MINMAX[0] = NCT6775_REG_IN_MIN;
 		data->REG_IN_MINMAX[1] = NCT6775_REG_IN_MAX;
@@ -3046,6 +3051,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->fan_from_reg = fan_from_reg13;
 		data->fan_from_reg_min = fan_from_reg13;
 
+		data->REG_VBAT = NCT6775_REG_VBAT;
 		data->REG_VIN = NCT6779_REG_IN;
 		data->REG_IN_MINMAX[0] = NCT6775_REG_IN_MIN;
 		data->REG_IN_MINMAX[1] = NCT6775_REG_IN_MAX;
@@ -3395,7 +3401,7 @@ static int __init nct6775_find(int sioaddr, unsigned short *addr,
 {
 	static const char __initdata sio_name_NCT6775[] = "NCT6775F";
 	static const char __initdata sio_name_NCT6776[] = "NCT6776F";
-	static const char __initdata sio_name_NCT6779[] = "NCT6779F";
+	static const char __initdata sio_name_NCT6779[] = "NCT6779D";
 
 	u16 val;
 	const char *sio_name;
@@ -3537,7 +3543,7 @@ static void __exit sensors_nct6775_exit(void)
 }
 
 MODULE_AUTHOR("Guenter Roeck <linux@roeck-us.net>");
-MODULE_DESCRIPTION("NCT677x driver");
+MODULE_DESCRIPTION("NCT6775F/NCT6776F/NCT6779D driver");
 MODULE_LICENSE("GPL");
 
 module_init(sensors_nct6775_init);
