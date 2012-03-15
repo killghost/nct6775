@@ -232,21 +232,21 @@ static const u16 NCT6775_REG_TEMP_OVER[]
 static const u16 NCT6775_REG_TEMP_SOURCE[]
 	= { 0x621, 0x622, 0x623, 0x624, 0x625, 0x626 };
 
-static const u16 NCT6775_REG_TEMP_SEL[] 
+static const u16 NCT6775_REG_TEMP_SEL[]
 	= { 0x100, 0x200, 0x300, 0x800, 0x900 };
 
-static const u16 NCT6775_REG_WEIGHT_TEMP_SEL[] 
+static const u16 NCT6775_REG_WEIGHT_TEMP_SEL[]
 	= { 0x139, 0x239, 0x339, 0x839, 0x939 };
-static const u16 NCT6775_REG_WEIGHT_TEMP_STEP[] 
+static const u16 NCT6775_REG_WEIGHT_TEMP_STEP[]
 	= { 0x13a, 0x23a, 0x33a, 0x83a, 0x93a };
-static const u16 NCT6775_REG_WEIGHT_TEMP_STEP_TOL[] 
+static const u16 NCT6775_REG_WEIGHT_TEMP_STEP_TOL[]
 	= { 0x13b, 0x23b, 0x33b, 0x83b, 0x93b };
-static const u16 NCT6775_REG_WEIGHT_DUTY_STEP[] 
+static const u16 NCT6775_REG_WEIGHT_DUTY_STEP[]
 	= { 0x13c, 0x23c, 0x33c, 0x83c, 0x93c };
-static const u16 NCT6775_REG_WEIGHT_TEMP_BASE[] 
+static const u16 NCT6775_REG_WEIGHT_TEMP_BASE[]
 	= { 0x13d, 0x23d, 0x33d, 0x83d, 0x93d };
 
-static const u16 NCT6776_REG_WEIGHT_DUTY_BASE[] 
+static const u16 NCT6776_REG_WEIGHT_DUTY_BASE[]
 	= { 0x13e, 0x23e, 0x33e, 0x83e, 0x93e };
 
 static const u16 NCT6775_REG_TEMP_OFFSET[] = { 0x454, 0x455, 0x456 };
@@ -634,8 +634,7 @@ static u16 nct6775_read_value(struct nct6775_data *data, u16 reg)
 	return res;
 }
 
-static int nct6775_write_value(struct nct6775_data *data, u16 reg,
-				 u16 value)
+static int nct6775_write_value(struct nct6775_data *data, u16 reg, u16 value)
 {
 	int word_sized = is_word_sized(data, reg);
 
@@ -666,8 +665,7 @@ static u16 nct6775_read_temp(struct nct6775_data *data, u16 reg)
 	return res;
 }
 
-static int nct6775_write_temp(struct nct6775_data *data, u16 reg,
-				       u16 value)
+static int nct6775_write_temp(struct nct6775_data *data, u16 reg, u16 value)
 {
 	if (!is_word_sized(data, reg))
 		value >>= 8;
@@ -703,7 +701,7 @@ static void nct6775_write_fan_div(struct nct6775_data *data, int nr)
 }
 
 static void nct6775_write_fan_div_common(struct device *dev,
-					   struct nct6775_data *data, int nr)
+					 struct nct6775_data *data, int nr)
 {
 	if (data->kind == nct6775)
 		nct6775_write_fan_div(data, nr);
@@ -723,7 +721,7 @@ static void nct6775_update_fan_div(struct nct6775_data *data)
 }
 
 static void nct6775_update_fan_div_common(struct device *dev,
-					    struct nct6775_data *data)
+					  struct nct6775_data *data)
 {
 	if (data->kind == nct6775)
 		nct6775_update_fan_div(data);
@@ -984,12 +982,12 @@ store_in_reg(struct device *dev, struct device_attribute *attr, const char *buf,
 	return count;
 }
 
-static ssize_t show_alarm(struct device *dev, struct device_attribute *attr,
-			  char *buf)
+static ssize_t
+show_alarm(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
-	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
-	int nr = sensor_attr->index;
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
+	int nr = sattr->index;
 	return sprintf(buf, "%u\n",
 		       (unsigned int)((data->alarms >> nr) & 0x01));
 }
@@ -1218,8 +1216,8 @@ static ssize_t
 show_fan(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
-	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
-	int nr = sensor_attr->index;
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
+	int nr = sattr->index;
 	return sprintf(buf, "%d\n", data->rpm[nr]);
 }
 
@@ -1227,20 +1225,19 @@ static ssize_t
 show_fan_min(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
-	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
-	int nr = sensor_attr->index;
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
+	int nr = sattr->index;
 	return sprintf(buf, "%d\n",
 		       data->fan_from_reg_min(data->fan_min[nr],
 					      data->fan_div[nr]));
 }
 
 static ssize_t
-show_fan_div(struct device *dev, struct device_attribute *attr,
-	     char *buf)
+show_fan_div(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
-	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
-	int nr = sensor_attr->index;
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
+	int nr = sattr->index;
 	return sprintf(buf, "%u\n", div_from_reg(data->fan_div[nr]));
 }
 
@@ -1249,8 +1246,8 @@ store_fan_min(struct device *dev, struct device_attribute *attr,
 	      const char *buf, size_t count)
 {
 	struct nct6775_data *data = dev_get_drvdata(dev);
-	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
-	int nr = sensor_attr->index;
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
+	int nr = sattr->index;
 	unsigned long val;
 	int err;
 	unsigned int reg;
@@ -1333,6 +1330,7 @@ write_div:
 		/* Give the chip time to sample a new speed value */
 		data->last_updated = jiffies;
 	}
+
 write_min:
 	nct6775_write_value(data, data->REG_FAN_MIN[nr],
 			      data->fan_min[nr]);
@@ -1382,8 +1380,8 @@ static ssize_t
 show_temp_label(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
-	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
-	int nr = sensor_attr->index;
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
+	int nr = sattr->index;
 	return sprintf(buf, "%s\n", data->temp_label[data->temp_src[nr]]);
 }
 
@@ -1425,9 +1423,9 @@ static ssize_t
 show_temp_offset(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
-	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
 
-	return sprintf(buf, "%d\n", data->temp_offset[sensor_attr->index] * 1000);
+	return sprintf(buf, "%d\n", data->temp_offset[sattr->index] * 1000);
 }
 
 static ssize_t
@@ -1435,8 +1433,8 @@ store_temp_offset(struct device *dev, struct device_attribute *attr,
 		  const char *buf, size_t count)
 {
 	struct nct6775_data *data = dev_get_drvdata(dev);
-	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
-	int nr = sensor_attr->index;
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
+	int nr = sattr->index;
 	long val;
 	int err;
 
@@ -1458,8 +1456,8 @@ static ssize_t
 show_temp_type(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
-	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
-	int nr = sensor_attr->index;
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
+	int nr = sattr->index;
 	return sprintf(buf, "%d\n", (int)data->temp_type[nr]);
 }
 
@@ -1536,9 +1534,9 @@ static ssize_t
 show_pwm_mode(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
-	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
 
-	return sprintf(buf, "%d\n", !data->pwm_mode[sensor_attr->index]);
+	return sprintf(buf, "%d\n", !data->pwm_mode[sattr->index]);
 }
 
 static ssize_t
@@ -1546,8 +1544,8 @@ store_pwm_mode(struct device *dev, struct device_attribute *attr,
 			const char *buf, size_t count)
 {
 	struct nct6775_data *data = dev_get_drvdata(dev);
-	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
-	int nr = sensor_attr->index;
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
+	int nr = sattr->index;
 	unsigned long val;
 	int err;
 	u8 reg;
@@ -1581,9 +1579,9 @@ static ssize_t
 show_pwm_enable(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
-	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
 
-	return sprintf(buf, "%d\n", data->pwm_enable[sensor_attr->index]);
+	return sprintf(buf, "%d\n", data->pwm_enable[sattr->index]);
 }
 
 static ssize_t
@@ -1660,8 +1658,8 @@ store_pwm_enable(struct device *dev, struct device_attribute *attr,
 		 const char *buf, size_t count)
 {
 	struct nct6775_data *data = dev_get_drvdata(dev);
-	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
-	int nr = sensor_attr->index;
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
+	int nr = sattr->index;
 	unsigned long val;
 	int err;
 	u16 reg;
@@ -1759,19 +1757,19 @@ static ssize_t
 show_target_temp(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
-	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
 
 	return sprintf(buf, "%d\n",
-		       data->target_temp[sensor_attr->index] * 1000);
+		       data->target_temp[sattr->index] * 1000);
 }
 
 static ssize_t
 store_target_temp(struct device *dev, struct device_attribute *attr,
-			const char *buf, size_t count)
+		  const char *buf, size_t count)
 {
 	struct nct6775_data *data = dev_get_drvdata(dev);
-	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
-	int nr = sensor_attr->index;
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
+	int nr = sattr->index;
 	long val;
 	int err;
 
@@ -1900,7 +1898,7 @@ static SENSOR_DEVICE_ATTR(pwm4_target, S_IWUSR | S_IRUGO, show_target_temp,
 static SENSOR_DEVICE_ATTR(pwm5_target, S_IWUSR | S_IRUGO, show_target_temp,
 			  store_target_temp, 4);
 
-/* Monitored pwm temperatures */ 
+/* Monitored pwm temperatures */
 static SENSOR_DEVICE_ATTR(temp7_input, S_IRUGO, show_pwm_temp, NULL, 0);
 static SENSOR_DEVICE_ATTR(temp8_input, S_IRUGO, show_pwm_temp, NULL, 1);
 static SENSOR_DEVICE_ATTR(temp9_input, S_IRUGO, show_pwm_temp, NULL, 2);
@@ -1924,8 +1922,8 @@ store_pwm_weight_enable(struct device *dev, struct device_attribute *attr,
 			const char *buf, size_t count)
 {
 	struct nct6775_data *data = dev_get_drvdata(dev);
-	struct sensor_device_attribute *sensor_attr = to_sensor_dev_attr(attr);
-	int nr = sensor_attr->index;
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
+	int nr = sattr->index;
 	unsigned long val;
 	int err;
 	u8 reg;
@@ -2134,13 +2132,14 @@ store_fan_time(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
-static ssize_t show_name(struct device *dev, struct device_attribute *attr,
-			 char *buf)
+static ssize_t
+show_name(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = dev_get_drvdata(dev);
 
 	return sprintf(buf, "%s\n", data->name);
 }
+
 static DEVICE_ATTR(name, S_IRUGO, show_name, NULL);
 
 static SENSOR_DEVICE_ATTR_2(pwm1_stop_time, S_IWUSR | S_IRUGO, show_fan_time,
@@ -2309,8 +2308,8 @@ static const struct attribute_group nct6775_group_pwm[5] = {
 	{ .attrs = nct6775_attributes_pwm[4] },
 };
 
-static ssize_t show_auto_pwm(struct device *dev, struct device_attribute *attr,
-			     char *buf)
+static ssize_t
+show_auto_pwm(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
@@ -2318,8 +2317,9 @@ static ssize_t show_auto_pwm(struct device *dev, struct device_attribute *attr,
 	return sprintf(buf, "%d\n", data->auto_pwm[sattr->nr][sattr->index]);
 }
 
-static ssize_t store_auto_pwm(struct device *dev, struct device_attribute *attr,
-			      const char *buf, size_t count)
+static ssize_t
+store_auto_pwm(struct device *dev, struct device_attribute *attr,
+	       const char *buf, size_t count)
 {
 	struct nct6775_data *data = dev_get_drvdata(dev);
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
@@ -2382,8 +2382,8 @@ static ssize_t store_auto_pwm(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
-static ssize_t show_auto_temp(struct device *dev, struct device_attribute *attr,
-			      char *buf)
+static ssize_t
+show_auto_temp(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
@@ -2397,9 +2397,9 @@ static ssize_t show_auto_temp(struct device *dev, struct device_attribute *attr,
 	return sprintf(buf, "%d\n", data->auto_temp[nr][point] * 1000);
 }
 
-static ssize_t store_auto_temp(struct device *dev,
-			       struct device_attribute *attr,
-			       const char *buf, size_t count)
+static ssize_t
+store_auto_temp(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t count)
 {
 	struct nct6775_data *data = dev_get_drvdata(dev);
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
@@ -2655,8 +2655,8 @@ show_vid(struct device *dev, struct device_attribute *attr, char *buf)
 	struct nct6775_data *data = dev_get_drvdata(dev);
 	return sprintf(buf, "%d\n", vid_from_reg(data->vid, data->vrm));
 }
-static DEVICE_ATTR(cpu0_vid, S_IRUGO, show_vid, NULL);
 
+static DEVICE_ATTR(cpu0_vid, S_IRUGO, show_vid, NULL);
 
 /* Case open detection */
 
@@ -2671,7 +2671,7 @@ show_caseopen(struct device *dev, struct device_attribute *attr, char *buf)
 
 static ssize_t
 clear_caseopen(struct device *dev, struct device_attribute *attr,
-			const char *buf, size_t count)
+	       const char *buf, size_t count)
 {
 	struct nct6775_data *data = dev_get_drvdata(dev);
 	struct nct6775_sio_data *sio_data = dev->platform_data;
