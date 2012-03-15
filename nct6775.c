@@ -360,6 +360,9 @@ static const char *const nct6779_temp_label[] = {
 	"BYTE_TEMP"
 };
 
+#define NUM_TEMP	10	/* Max number of temp attribute sets w/ limits*/
+#define NUM_TEMP_FIXED	6	/* Max number of fixed temp attribute sets */
+
 #define NUM_REG_TEMP	ARRAY_SIZE(NCT6775_REG_TEMP)
 
 static inline int reg_to_pwm_enable(int pwm, int mode)
@@ -468,9 +471,9 @@ struct nct6775_data {
 	struct device *hwmon_dev;
 	struct mutex lock;
 
-	u16 reg_temp[3][NUM_REG_TEMP]; /* 0=temp, 1=temp_over, 2=temp_hyst */
-	u8 temp_src[NUM_REG_TEMP];
-	u16 reg_temp_config[NUM_REG_TEMP];
+	u16 reg_temp[3][NUM_TEMP]; /* 0=temp, 1=temp_over, 2=temp_hyst */
+	u8 temp_src[NUM_TEMP];
+	u16 reg_temp_config[NUM_TEMP];
 	const char * const *temp_label;
 
 	u16 REG_CONFIG;
@@ -531,10 +534,10 @@ struct nct6775_data {
 	u8 has_fan_min;		/* some fans don't have min register */
 	bool has_fan_div;
 
-	u8 temp_num_fixed;	/* 3 or 6 */
-	u8 temp_type[6];
-	s8 temp_offset[6];
-	s16 temp[3][NUM_REG_TEMP]; /* 0=temp, 1=temp_over, 2=temp_hyst */
+	u8 temp_fixed_num;	/* 3 or 6 */
+	u8 temp_type[NUM_TEMP_FIXED];
+	s8 temp_offset[NUM_TEMP_FIXED];
+	s16 temp[3][NUM_TEMP]; /* 0=temp, 1=temp_over, 2=temp_hyst */
 	u64 alarms;
 	u8 caseopen;
 
@@ -572,6 +575,7 @@ struct nct6775_data {
 	u8 vrm;
 
 	u16 have_temp;
+	u16 have_temp_fixed;
 	u16 have_in;
 };
 
@@ -921,7 +925,7 @@ static struct nct6775_data *nct6775_update_device(struct device *dev)
 		nct6775_update_pwm_limits(dev);
 
 		/* Measured temperatures and limits */
-		for (i = 0; i < NUM_REG_TEMP; i++) {
+		for (i = 0; i < NUM_TEMP; i++) {
 			if (!(data->have_temp & (1 << i)))
 				continue;
 			for (j = 0; j < 3; j++) {
@@ -930,7 +934,7 @@ static struct nct6775_data *nct6775_update_device(struct device *dev)
 					  = nct6775_read_temp(data,
 						data->reg_temp[j][i]);
 			}
-			if (i > data->temp_num_fixed)
+			if (!(data->have_temp_fixed & (1 << i)))
 				continue;
 			data->temp_offset[i]
 			  = nct6775_read_value(data, data->REG_TEMP_OFFSET[i]);
@@ -1516,6 +1520,10 @@ static struct sensor_device_attribute_2 sda_temp_input[] = {
 	SENSOR_ATTR_2(temp4_input, S_IRUGO, show_temp, NULL, 3, 0),
 	SENSOR_ATTR_2(temp5_input, S_IRUGO, show_temp, NULL, 4, 0),
 	SENSOR_ATTR_2(temp6_input, S_IRUGO, show_temp, NULL, 5, 0),
+	SENSOR_ATTR_2(temp7_input, S_IRUGO, show_temp, NULL, 6, 0),
+	SENSOR_ATTR_2(temp8_input, S_IRUGO, show_temp, NULL, 7, 0),
+	SENSOR_ATTR_2(temp9_input, S_IRUGO, show_temp, NULL, 8, 0),
+	SENSOR_ATTR_2(temp10_input, S_IRUGO, show_temp, NULL, 9, 0),
 };
 
 static struct sensor_device_attribute sda_temp_label[] = {
@@ -1525,6 +1533,10 @@ static struct sensor_device_attribute sda_temp_label[] = {
 	SENSOR_ATTR(temp4_label, S_IRUGO, show_temp_label, NULL, 3),
 	SENSOR_ATTR(temp5_label, S_IRUGO, show_temp_label, NULL, 4),
 	SENSOR_ATTR(temp6_label, S_IRUGO, show_temp_label, NULL, 5),
+	SENSOR_ATTR(temp7_label, S_IRUGO, show_temp_label, NULL, 6),
+	SENSOR_ATTR(temp8_label, S_IRUGO, show_temp_label, NULL, 7),
+	SENSOR_ATTR(temp9_label, S_IRUGO, show_temp_label, NULL, 8),
+	SENSOR_ATTR(temp10_label, S_IRUGO, show_temp_label, NULL, 9),
 };
 
 static struct sensor_device_attribute_2 sda_temp_max[] = {
@@ -1540,6 +1552,14 @@ static struct sensor_device_attribute_2 sda_temp_max[] = {
 		      4, 1),
 	SENSOR_ATTR_2(temp6_max, S_IRUGO | S_IWUSR, show_temp, store_temp,
 		      5, 1),
+	SENSOR_ATTR_2(temp7_max, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      6, 1),
+	SENSOR_ATTR_2(temp8_max, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      7, 1),
+	SENSOR_ATTR_2(temp9_max, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      8, 1),
+	SENSOR_ATTR_2(temp10_max, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      9, 1),
 };
 
 static struct sensor_device_attribute_2 sda_temp_max_hyst[] = {
@@ -1555,6 +1575,14 @@ static struct sensor_device_attribute_2 sda_temp_max_hyst[] = {
 		      4, 2),
 	SENSOR_ATTR_2(temp6_max_hyst, S_IRUGO | S_IWUSR, show_temp, store_temp,
 		      5, 2),
+	SENSOR_ATTR_2(temp7_max_hyst, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      6, 2),
+	SENSOR_ATTR_2(temp8_max_hyst, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      7, 2),
+	SENSOR_ATTR_2(temp9_max_hyst, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      8, 2),
+	SENSOR_ATTR_2(temp9_max_hyst, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      9, 2),
 };
 
 static struct sensor_device_attribute sda_temp_offset[] = {
@@ -1572,12 +1600,6 @@ static struct sensor_device_attribute sda_temp_offset[] = {
 		    store_temp_offset, 5),
 };
 
-static struct sensor_device_attribute sda_temp_alarm[] = {
-	SENSOR_ATTR(temp1_alarm, S_IRUGO, show_alarm, NULL, 4),
-	SENSOR_ATTR(temp2_alarm, S_IRUGO, show_alarm, NULL, 5),
-	SENSOR_ATTR(temp3_alarm, S_IRUGO, show_alarm, NULL, 13),
-};
-
 static struct sensor_device_attribute sda_temp_type[] = {
 	SENSOR_ATTR(temp1_type, S_IRUGO | S_IWUSR, show_temp_type,
 		    store_temp_type, 0),
@@ -1592,6 +1614,14 @@ static struct sensor_device_attribute sda_temp_type[] = {
 	SENSOR_ATTR(temp6_type, S_IRUGO | S_IWUSR, show_temp_type,
 		    store_temp_type, 5),
 };
+
+static struct sensor_device_attribute sda_temp_alarm[] = {
+	SENSOR_ATTR(temp1_alarm, S_IRUGO, show_alarm, NULL, 4),
+	SENSOR_ATTR(temp2_alarm, S_IRUGO, show_alarm, NULL, 5),
+	SENSOR_ATTR(temp3_alarm, S_IRUGO, show_alarm, NULL, 13),
+};
+
+#define NUM_TEMP_ALARM	ARRAY_SIZE(sda_temp_alarm)
 
 static ssize_t
 show_pwm_mode(struct device *dev, struct device_attribute *attr, char *buf)
@@ -1962,11 +1992,11 @@ static SENSOR_DEVICE_ATTR(pwm5_target, S_IWUSR | S_IRUGO, show_target_temp,
 			  store_target_temp, 4);
 
 /* Monitored pwm temperatures */
-static SENSOR_DEVICE_ATTR(temp7_input, S_IRUGO, show_pwm_temp, NULL, 0);
-static SENSOR_DEVICE_ATTR(temp8_input, S_IRUGO, show_pwm_temp, NULL, 1);
-static SENSOR_DEVICE_ATTR(temp9_input, S_IRUGO, show_pwm_temp, NULL, 2);
-static SENSOR_DEVICE_ATTR(temp10_input, S_IRUGO, show_pwm_temp, NULL, 3);
-static SENSOR_DEVICE_ATTR(temp11_input, S_IRUGO, show_pwm_temp, NULL, 4);
+static SENSOR_DEVICE_ATTR(temp11_input, S_IRUGO, show_pwm_temp, NULL, 0);
+static SENSOR_DEVICE_ATTR(temp12_input, S_IRUGO, show_pwm_temp, NULL, 1);
+static SENSOR_DEVICE_ATTR(temp13_input, S_IRUGO, show_pwm_temp, NULL, 2);
+static SENSOR_DEVICE_ATTR(temp14_input, S_IRUGO, show_pwm_temp, NULL, 3);
+static SENSOR_DEVICE_ATTR(temp15_input, S_IRUGO, show_pwm_temp, NULL, 4);
 
 /* Smart Fan registers */
 
@@ -2262,7 +2292,7 @@ static SENSOR_DEVICE_ATTR_2(pwm5_stop_output, S_IWUSR | S_IRUGO, show_pwm,
 
 static struct attribute *nct6775_attributes_pwm[5][19] = {
 	{
-		&sensor_dev_attr_temp7_input.dev_attr.attr,
+		&sensor_dev_attr_temp11_input.dev_attr.attr,
 		&sensor_dev_attr_pwm1.dev_attr.attr,
 		&sensor_dev_attr_pwm1_mode.dev_attr.attr,
 		&sensor_dev_attr_pwm1_enable.dev_attr.attr,
@@ -2282,7 +2312,7 @@ static struct attribute *nct6775_attributes_pwm[5][19] = {
 		NULL
 	},
 	{
-		&sensor_dev_attr_temp8_input.dev_attr.attr,
+		&sensor_dev_attr_temp12_input.dev_attr.attr,
 		&sensor_dev_attr_pwm2.dev_attr.attr,
 		&sensor_dev_attr_pwm2_mode.dev_attr.attr,
 		&sensor_dev_attr_pwm2_enable.dev_attr.attr,
@@ -2302,7 +2332,7 @@ static struct attribute *nct6775_attributes_pwm[5][19] = {
 		NULL
 	},
 	{
-		&sensor_dev_attr_temp9_input.dev_attr.attr,
+		&sensor_dev_attr_temp13_input.dev_attr.attr,
 		&sensor_dev_attr_pwm3.dev_attr.attr,
 		&sensor_dev_attr_pwm3_mode.dev_attr.attr,
 		&sensor_dev_attr_pwm3_enable.dev_attr.attr,
@@ -2322,7 +2352,7 @@ static struct attribute *nct6775_attributes_pwm[5][19] = {
 		NULL
 	},
 	{
-		&sensor_dev_attr_temp10_input.dev_attr.attr,
+		&sensor_dev_attr_temp14_input.dev_attr.attr,
 		&sensor_dev_attr_pwm4.dev_attr.attr,
 		&sensor_dev_attr_pwm4_mode.dev_attr.attr,
 		&sensor_dev_attr_pwm4_enable.dev_attr.attr,
@@ -2342,7 +2372,7 @@ static struct attribute *nct6775_attributes_pwm[5][19] = {
 		NULL
 	},
 	{
-		&sensor_dev_attr_temp11_input.dev_attr.attr,
+		&sensor_dev_attr_temp15_input.dev_attr.attr,
 		&sensor_dev_attr_pwm5.dev_attr.attr,
 		&sensor_dev_attr_pwm5_mode.dev_attr.attr,
 		&sensor_dev_attr_pwm5_enable.dev_attr.attr,
@@ -2804,18 +2834,18 @@ static void nct6775_device_remove_files(struct device *dev)
 		device_remove_file(dev, &sda_fan_div[i].dev_attr);
 		device_remove_file(dev, &sda_fan_min[i].dev_attr);
 	}
-	for (i = 0; i < NUM_REG_TEMP; i++) {
+	for (i = 0; i < NUM_TEMP; i++) {
 		if (!(data->have_temp & (1 << i)))
 			continue;
 		device_remove_file(dev, &sda_temp_input[i].dev_attr);
 		device_remove_file(dev, &sda_temp_label[i].dev_attr);
 		device_remove_file(dev, &sda_temp_max[i].dev_attr);
 		device_remove_file(dev, &sda_temp_max_hyst[i].dev_attr);
-		if (i > data->temp_num_fixed)
+		if (!(data->have_temp_fixed & (1 << i)))
 			continue;
 		device_remove_file(dev, &sda_temp_type[i].dev_attr);
 		device_remove_file(dev, &sda_temp_offset[i].dev_attr);
-		if (i > 2)
+		if (i >= NUM_TEMP_ALARM)
 			continue;
 		device_remove_file(dev, &sda_temp_alarm[i].dev_attr);
 	}
@@ -2841,7 +2871,7 @@ static inline void __devinit nct6775_init_device(struct nct6775_data *data)
 	}
 
 	/* Enable temperature sensors if needed */
-	for (i = 0; i < NUM_REG_TEMP; i++) {
+	for (i = 0; i < NUM_TEMP; i++) {
 		if (!(data->have_temp & (1 << i)))
 			continue;
 		if (!data->reg_temp_config[i])
@@ -2859,7 +2889,9 @@ static inline void __devinit nct6775_init_device(struct nct6775_data *data)
 
 	diode = nct6775_read_value(data, data->REG_DIODE);
 
-	for (i = 0; i < data->num_temp_fixed; i++) {
+	for (i = 0; i < data->temp_fixed_num; i++) {
+		if (!(data->have_temp_fixed & (1 << i)))
+			continue;
 		if ((tmp & (0x02 << i)))	/* diode */
 			data->temp_type[i] = 3 - ((diode >> i) & 0x02);
 		else				/* thermistor */
@@ -2984,7 +3016,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->pwm_num = 3;
 		data->auto_pwm_num = 6;
 		data->has_fan_div = true;
-		data->num_temp_fixed = 3;
+		data->temp_fixed_num = 3;
 
 		data->fan_from_reg = fan_from_reg16;
 		data->fan_from_reg_min = fan_from_reg8;
@@ -3038,7 +3070,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->pwm_num = 3;
 		data->auto_pwm_num = 4;
 		data->has_fan_div = false;
-		data->num_temp_fixed = 3;
+		data->temp_fixed_num = 3;
 
 		data->fan_from_reg = fan_from_reg13;
 		data->fan_from_reg_min = fan_from_reg13;
@@ -3093,7 +3125,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->pwm_num = 5;
 		data->auto_pwm_num = 4;
 		data->has_fan_div = false;
-		data->num_temp_fixed = 6;
+		data->temp_fixed_num = 6;
 
 		data->fan_from_reg = fan_from_reg13;
 		data->fan_from_reg_min = fan_from_reg13;
@@ -3150,7 +3182,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 	/* Default to no temperature inputs, code below will adjust as needed */
 	data->have_temp = 0;
 
-	s = 3;	/* Index for first non-standard temperature */
+	s = NUM_TEMP_FIXED;	/* Index for first non-standard temperature */
 	for (i = 0; i < NUM_REG_TEMP; i++) {
 		if (reg_temp[i] == 0)
 			continue;
@@ -3162,8 +3194,9 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 			continue;
 
 		/* Use fixed index for SYSTIN(1), CPUTIN(2), AUXTIN(3) */
-		if (src <= data->num_temp_fixed) {
+		if (src <= data->temp_fixed_num) {
 			data->have_temp |= (1 << (src - 1));
+			data->have_temp_fixed |= (1 << (src - 1));
 			mask |= 1 << src;
 			data->reg_temp[0][src - 1] = reg_temp[i];
 			data->reg_temp[1][src - 1] = reg_temp_over[i];
@@ -3173,7 +3206,10 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 			continue;
 		}
 
-		/* Use dynamic index starting with <s> for other sources */
+		if (s >= NUM_TEMP)
+			continue;
+
+		/* Use dynamic index for other sources */
 		data->have_temp |= 1 << s;
 		mask |= 1 << src;
 
@@ -3348,7 +3384,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		}
 	}
 
-	for (i = 0; i < NUM_REG_TEMP; i++) {
+	for (i = 0; i < NUM_TEMP; i++) {
 		if (!(data->have_temp & (1 << i)))
 			continue;
 		err = device_create_file(dev, &sda_temp_input[i].dev_attr);
@@ -3372,7 +3408,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 			if (err)
 				goto exit_remove;
 		}
-		if (i > data->num_temp_fixed)
+		if (!(data->have_temp_fixed & (1 << i)))
 			continue;
 		err = device_create_file(dev, &sda_temp_type[i].dev_attr);
 		if (err)
@@ -3381,7 +3417,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 					 &sda_temp_offset[i].dev_attr);
 		if (err)
 			goto exit_remove;
-		if (i > 2)
+		if (i >= NUM_TEMP_ALARM)
 			continue;
 		err = device_create_file(dev, &sda_temp_alarm[i].dev_attr);
 		if (err)
