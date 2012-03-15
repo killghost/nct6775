@@ -469,6 +469,7 @@ struct nct6775_data {
 	u16 reg_temp_config[NUM_REG_TEMP];
 	const char * const *temp_label;
 
+	u16 REG_CONFIG;
 	u16 REG_VBAT;
 
 	const u16 *REG_VIN;
@@ -2768,10 +2769,11 @@ static inline void __devinit nct6775_init_device(struct nct6775_data *data)
 	u8 tmp;
 
 	/* Start monitoring if needed */
-	tmp = nct6775_read_value(data, NCT6775_REG_CONFIG);
-	if (!(tmp & 0x01))
-		nct6775_write_value(data, NCT6775_REG_CONFIG,
-				      tmp | 0x01);
+	if (data->REG_CONFIG) {
+		tmp = nct6775_read_value(data, data->REG_CONFIG);
+		if (!(tmp & 0x01))
+			nct6775_write_value(data, data->REG_CONFIG, tmp | 0x01);
+	}
 
 	/* Enable temperature sensors if needed */
 	for (i = 0; i < NUM_REG_TEMP; i++) {
@@ -2949,6 +2951,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->fan_from_reg = fan_from_reg16;
 		data->fan_from_reg_min = fan_from_reg8;
 
+		data->REG_CONFIG = NCT6775_REG_CONFIG;
 		data->REG_VBAT = NCT6775_REG_VBAT;
 		data->REG_VIN = NCT6775_REG_IN;
 		data->REG_IN_MINMAX[0] = NCT6775_REG_IN_MIN;
@@ -2999,6 +3002,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->fan_from_reg = fan_from_reg13;
 		data->fan_from_reg_min = fan_from_reg13;
 
+		data->REG_CONFIG = NCT6775_REG_CONFIG;
 		data->REG_VBAT = NCT6775_REG_VBAT;
 		data->REG_VIN = NCT6775_REG_IN;
 		data->REG_IN_MINMAX[0] = NCT6775_REG_IN_MIN;
@@ -3051,6 +3055,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->fan_from_reg = fan_from_reg13;
 		data->fan_from_reg_min = fan_from_reg13;
 
+		data->REG_CONFIG = NCT6775_REG_CONFIG;
 		data->REG_VBAT = NCT6775_REG_VBAT;
 		data->REG_VIN = NCT6779_REG_IN;
 		data->REG_IN_MINMAX[0] = NCT6775_REG_IN_MIN;
