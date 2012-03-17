@@ -1,7 +1,7 @@
 Note
 ====
 
-This driver is experimental and has only been tested on NCT6775F.
+This driver is experimental and has only been tested on NCT6775F and NCT6776F.
 
 ABI (sysfs attribute support) is not final and is expected to change
 repeatedly before the driver is stable. Until then, please feel free
@@ -23,7 +23,7 @@ Supported chips:
     Addresses scanned: ISA address retrieved from Super I/O registers
     Datasheet: Available from Nuvoton upon request
   * Nuvoton NCT6779D
-    Prefix: 'nct6776'
+    Prefix: 'nct6779'
     Addresses scanned: ISA address retrieved from Super I/O registers
     Datasheet: Available from Nuvoton upon request
 
@@ -36,10 +36,11 @@ Description
 This driver implements support for the Nuvoton NCT6775F, NCT6776F, and NCT6779D
 super I/O chips. We will refer to them collectively as Nuvoton chips.
 
-The chips implement 2 to 4 temperature sensors (9 for NCT6775F and NCT6776F),
-2 to 5 fan rotation speed sensors, 8 to 15 analog voltage sensors, one VID,
-alarms with beep warnings (control unimplemented), and some automatic fan
-regulation strategies (plus manual fan control mode).
+The chips implement up to 8 temperature sensors depending on the chip type and
+configuration. Temperatures used to control fan speed are reported separately.
+There are 4 to 5 fan rotation speed sensors, 8 to 15 analog voltage sensors,
+one VID, alarms with beep warnings (control unimplemented), and some automatic
+fan regulation strategies (plus manual fan control mode).
 
 The temperature sensor sources on all chips are configurable. temp4 and higher
 attributes are only reported if its temperature source differs from the
@@ -47,12 +48,11 @@ temperature sources of the already reported temperature sensors.
 The configured source for each of the temperature sensors is provided
 in tempX_label.
 
-Temperatures are measured in degrees Celsius and measurement resolution is 1
-degC for temp1 and and 0.5 degC for temp2 and temp3. For temp4 and higher,
-resolution is 1 degC for W83667HG-B and 0.5 degC for NCT6775F and NCT6776F.
-An alarm is triggered when the temperature gets higher than high limit;
-it stays on until the temperature falls below the hysteresis value.
-Alarms are only supported for temp1, temp2, and temp3.
+Temperatures are measured in degrees Celsius and measurement resolution is
+either 1 degC or 0.5 degC, depending on the temperature source and
+configuration. An alarm is triggered when the temperature gets higher than
+the high limit; it stays on until the temperature falls below the hysteresis
+value. Alarms are only supported for temp1, temp2, and temp3.
 
 Fan rotation speeds are reported in RPM (rotations per minute). An alarm is
 triggered if the rotation speed has dropped below a programmable limit. Fan
@@ -70,12 +70,17 @@ In this mode, the chip attempts to keep the measured temperature in a
 predefined temperature range. If the temperature goes out of range, fan
 is driven slower/faster to reach the predefined range again.
 
-The mode works for fan1-fan4. Mapping of temperatures to pwm outputs is as
+The mode works for fan1-fan5. Mapping of temperatures to pwm outputs is as
 follows:
 
-temp1 -> pwm1
-temp2 -> pwm2
-temp3 -> pwm3
+temp11 -> pwm1
+temp12 -> pwm2
+temp13 -> pwm3
+temp14 -> pwm4 (NCT6779D only)
+temp15 -> pwm5 (NCT6779D only)
+
+The temperature source used to control pwm1..pwm5 (temp11..temp15) can be
+configured with pwm[1..5]_temp_sel.
 
 /sys files
 ----------
@@ -92,9 +97,8 @@ pwm[1-5]_enable - this file controls mode of fan/temperature control:
 	* 1 Manual mode, write to pwm file any value 0-255 (full speed)
 	* 2 "Thermal Cruise" mode
 	* 3 "Fan Speed Cruise" mode
-	* 4 "Smart Fan IV" mode
-
-	SmartFan III mode is not supported by the driver.
+	* 4 "Smart Fan III" mode (NCT6775F only)
+	* 5 "Smart Fan IV" mode
 
 pwm[1-5]_mode - controls if output is PWM or DC level
         * 0 DC output (0 - 12v)
@@ -129,7 +133,6 @@ Speed Cruise mode
 
 This modes tries to keep the fan speed constant.
 Untested; use at your own risk.
-Support may be removed in a later version of the driver.
 
 
 Implementation Details
