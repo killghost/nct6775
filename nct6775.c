@@ -1830,9 +1830,9 @@ store_pwm_temp_sel(struct device *dev, struct device_attribute *attr,
 	int err;
 	int reg;
 	static const int max_src[] = {
-	    ARRAY_SIZE(nct6775_temp_label),
-	    ARRAY_SIZE(nct6776_temp_label),
-	    ARRAY_SIZE(nct6779_temp_label)
+	    ARRAY_SIZE(nct6775_temp_label) - 1,
+	    ARRAY_SIZE(nct6776_temp_label) - 1,
+	    ARRAY_SIZE(nct6779_temp_label) - 1
 	};
 
 	err = kstrtoul(buf, 10, &val);
