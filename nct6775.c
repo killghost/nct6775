@@ -495,7 +495,7 @@ struct nct6775_data {
 	const u16 *REG_PWM[7];	/* [0]=pwm, [1]=start_output, [2]=stop_output,
 				 * [3]=max_output, [4]=step_output,
 				 * [5]=weight_duty_step, [6]=weight_duty_base
-			 	 */
+				 */
 	const u16 *REG_PWM_READ;
 
 	const u16 *REG_TEMP_FIXED;
@@ -952,7 +952,7 @@ static struct nct6775_data *nct6775_update_device(struct device *dev)
 			if (!data->REG_ALARM[i])
 				continue;
 			alarm = nct6775_read_value(data, data->REG_ALARM[i]);
-			data->alarms |= (((u64)alarm) << (i << 3));
+			data->alarms |= ((u64)alarm) << (i << 3);
 		}
 
 		data->caseopen = nct6775_read_value(data, data->REG_CASEOPEN);
@@ -1501,7 +1501,7 @@ store_temp_type(struct device *dev, struct device_attribute *attr,
 	vbat = nct6775_read_value(data, data->REG_VBAT) & ~(0x02 << nr);
 	diode = nct6775_read_value(data, data->REG_DIODE) & ~(0x02 << nr);
 	bit = 0x02 << nr;
-	switch(val) {
+	switch (val) {
 	case 1:	/* CPU diode (diode, current mode) */
 		vbat |= bit;
 		diode |= bit;
@@ -1792,7 +1792,7 @@ store_pwm_enable(struct device *dev, struct device_attribute *attr,
 	}
 	reg = nct6775_read_value(data, data->REG_FAN_MODE[nr]);
 	reg &= 0x0f;
-	reg |= (pwm_enable_to_reg(val) << 4);
+	reg |= pwm_enable_to_reg(val) << 4;
 	nct6775_write_value(data, data->REG_FAN_MODE[nr], reg);
 	mutex_unlock(&data->update_lock);
 	return count;
@@ -2995,8 +2995,8 @@ nct6775_check_fan_inputs(const struct nct6775_sio_data *sio_data,
 	superio_exit(sio_data->sioreg);
 
 	data->has_fan = data->has_fan_min = 0x03; /* fan1 and fan2 */
-	data->has_fan |= (fan3pin << 2);
-	data->has_fan_min |= (fan3min << 2);
+	data->has_fan |= fan3pin << 2;
+	data->has_fan_min |= fan3min << 2;
 
 	data->has_fan |= (fan4pin << 3) | (fan5pin << 4);
 	data->has_fan_min |= (fan4min << 3) | (fan5pin << 4);
@@ -3011,7 +3011,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 	struct nct6775_data *data;
 	struct resource *res;
 	int i, s, err = 0;
-	int src, mask = 0;
+	int src, mask, available;
 	const u16 *reg_temp, *reg_temp_over, *reg_temp_hyst, *reg_temp_config;
 
 	res = platform_get_resource(pdev, IORESOURCE_IO, 0);
@@ -3210,24 +3210,72 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		goto exit_release;
 	}
 
-	/* Default to no temperature inputs, code below will adjust as needed */
 	data->have_temp = 0;
 
-	s = NUM_TEMP_FIXED;	/* Index for first non-standard temperature */
+	/*
+	 * On some boards, not all available temperature sources are monitored,
+	 * even though some of the monitoring registers are unused.
+	 * Get list of unused monitoring registers, then detect if any fan
+	 * controls are configured to use unmonitored temperature sources.
+	 * If so, assign the unmonitored temperature sources to available
+	 * monitoring registers.
+	 */
+	mask = 0;
+	available = 0;
 	for (i = 0; i < NUM_REG_TEMP; i++) {
 		if (reg_temp[i] == 0)
 			continue;
 
-		src = nct6775_read_value(data, data->REG_TEMP_SOURCE[i]);
-		src &= 0x1f;
+		src = nct6775_read_value(data, data->REG_TEMP_SOURCE[i]) & 0x1f;
+		if (!src || (mask & (1 << src)))
+			available |= 1 << i;
 
+		mask |= 1 << src;
+	}
+
+	/*
+	 * Now find unmonitored temperature registers and enable monitoring
+	 * if additional monitoring registers are available.
+	 */
+	for (i = 0; i < ARRAY_SIZE(data->REG_TEMP_SEL) && available; i++) {
+		int j;
+
+		if (!data->REG_TEMP_SEL[i])
+			continue;
+		for (j = 0; j < data->pwm_num && available; j++) {
+			int index;
+
+			if (!data->REG_TEMP_SEL[i][j])
+				continue;
+			src = nct6775_read_value(data,
+						 data->REG_TEMP_SEL[i][j]);
+			src &= 0x1f;
+			if (!src || (mask & (1 << src)))
+				continue;
+
+			index = __ffs(available);
+			nct6775_write_value(data,
+					    data->REG_TEMP_SOURCE[index],
+					    src);
+			available &= ~(1 << index);
+			mask |= 1 << src;
+		}
+	}
+
+	mask = 0;
+	s = NUM_TEMP_FIXED;	/* First dynamic temperature attribute */
+	for (i = 0; i < NUM_REG_TEMP; i++) {
+		if (reg_temp[i] == 0)
+			continue;
+
+		src = nct6775_read_value(data, data->REG_TEMP_SOURCE[i]) & 0x1f;
 		if (!src || (mask & (1 << src)))
 			continue;
 
 		/* Use fixed index for SYSTIN(1), CPUTIN(2), AUXTIN(3) */
 		if (src <= data->temp_fixed_num) {
-			data->have_temp |= (1 << (src - 1));
-			data->have_temp_fixed |= (1 << (src - 1));
+			data->have_temp |= 1 << (src - 1);
+			data->have_temp_fixed |= 1 << (src - 1);
 			mask |= 1 << src;
 			data->reg_temp[0][src - 1] = reg_temp[i];
 			data->reg_temp[1][src - 1] = reg_temp_over[i];
@@ -3249,7 +3297,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->reg_temp[2][s] = reg_temp_hyst[i];
 		data->reg_temp_config[s] = reg_temp_config[i];
 
-
 		data->temp_src[s] = src;
 		s++;
 	}
@@ -3260,7 +3307,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 				continue;
 			if (!data->REG_TEMP_FIXED[i])
 				continue;
-			data->have_temp |= (1 << i);
+			data->have_temp |= 1 << i;
 			data->reg_temp[0][i] = data->REG_TEMP_FIXED[i];
 			data->temp_src[i] = i + 1;
 		}
