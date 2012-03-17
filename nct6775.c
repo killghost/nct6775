@@ -54,6 +54,8 @@
 #include <linux/io.h>
 #include "lm75.h"
 
+#define TESTING
+
 enum kinds { nct6775, nct6776, nct6779 };
 
 /* used to set data->name = nct6775_device_names[data->sio_kind] */
@@ -3328,6 +3330,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		s++;
 	}
 
+#ifdef TESTING
 	/*
 	 * We may have alternate registers for some sensors.
 	 * Go through the list and enable if possible.
@@ -3338,10 +3341,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		for (i = 0; i < data->temp_label_num; i++) {
 			if (!data->REG_TEMP_ALTERNATE[i])
 				continue;
-		    	pr_info("Alternate index %d reg 0x%x source %s mask 0x%x have 0x%x s %d\n",
-				i, data->REG_TEMP_ALTERNATE[i],
-				data->temp_label[i + 1], mask,
-				data->have_temp, s);
 			if (mask & (1 << (i + 1)))
 				continue;
 			if (i < data->temp_fixed_num) {
@@ -3362,6 +3361,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 			s++;
 		}
 	}
+#endif /* TESTING */
 
 	switch (data->kind) {
 	case nct6775:
