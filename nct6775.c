@@ -226,8 +226,6 @@ static const u16 NCT6779_REG_FAN[] = { 0x4c0, 0x4c2, 0x4c4, 0x4c6, 0x4c8 };
 static const u16 NCT6775_REG_TEMP[]
 	= { 0x27, 0x150, 0x250, 0x62b, 0x62c, 0x62d };
 static const u16 NCT6779_REG_TEMP[] = { 0x27, 0x150 };
-static const u16 NCT6779_REG_TEMP_FIXED[]
-	= { 0x490, 0x491, 0x492, 0x493, 0x494, 0x495};
 
 static const u16 NCT6775_REG_TEMP_CONFIG[]
 	= { 0, 0x152, 0x252, 0x628, 0x629, 0x62A };
@@ -366,6 +364,17 @@ static const char *const nct6779_temp_label[] = {
 	"BYTE_TEMP"
 };
 
+static const u16 NCT6775_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6779_temp_label)]
+	= { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x661, 0x662, 0x664 };
+
+static const u16 NCT6776_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6776_temp_label)]
+	= { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x401, 0x402, 0x404 };
+
+static const u16 NCT6779_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6779_temp_label)]
+	= { 0x490, 0x491, 0x492, 0x493, 0x494, 0x495, 0, 0,
+	    0, 0, 0, 0, 0, 0, 0, 0,
+	    0, 0, 0x401, 0x402, 0x404 };
+
 #define NUM_TEMP	10	/* Max number of temp attribute sets w/ limits*/
 #define NUM_TEMP_FIXED	6	/* Max number of fixed temp attribute sets */
 
@@ -475,6 +484,7 @@ struct nct6775_data {
 	u8 temp_src[NUM_TEMP];
 	u16 reg_temp_config[NUM_TEMP];
 	const char * const *temp_label;
+	int temp_label_num;
 
 	u16 REG_CONFIG;
 	u16 REG_VBAT;
@@ -498,7 +508,7 @@ struct nct6775_data {
 				 */
 	const u16 *REG_PWM_READ;
 
-	const u16 *REG_TEMP_FIXED;
+	const u16 *REG_TEMP_ALTERNATE;
 	const u16 *REG_TEMP_MON;
 	const u16 *REG_AUTO_TEMP;
 	const u16 *REG_AUTO_PWM;
@@ -595,7 +605,6 @@ static bool is_word_sized(struct nct6775_data *data, u16 reg)
 {
 	switch (data->kind) {
 	case nct6775:
-	case nct6776:
 		return (((reg & 0xff00) == 0x100 ||
 		    (reg & 0xff00) == 0x200) &&
 		   ((reg & 0x00ff) == 0x50 ||
@@ -603,11 +612,24 @@ static bool is_word_sized(struct nct6775_data *data, u16 reg)
 		    (reg & 0x00ff) == 0x55)) ||
 		  (reg & 0xfff0) == 0x630 ||
 		  reg == 0x640 || reg == 0x642 ||
+		  reg == 0x662 ||
+		  ((reg & 0xfff0) == 0x650 && (reg & 0x000f) >= 0x06) ||
+		  reg == 0x73 || reg == 0x75 || reg == 0x77;
+	case nct6776:
+		return (((reg & 0xff00) == 0x100 ||
+		    (reg & 0xff00) == 0x200) &&
+		   ((reg & 0x00ff) == 0x50 ||
+		    (reg & 0x00ff) == 0x53 ||
+		    (reg & 0x00ff) == 0x55)) ||
+		  (reg & 0xfff0) == 0x630 ||
+		  reg == 0x402 ||
+		  reg == 0x640 || reg == 0x642 ||
 		  ((reg & 0xfff0) == 0x650 && (reg & 0x000f) >= 0x06) ||
 		  reg == 0x73 || reg == 0x75 || reg == 0x77;
 	case nct6779:
 		return reg == 0x150 || reg == 0x153 || reg == 0x155 ||
 		  ((reg & 0xfff0) == 0x4c0 && (reg & 0x000f) < 0x09) ||
+		  reg == 0x402 ||
 		  reg == 0x63a || reg == 0x63c || reg == 0x63e ||
 		  reg == 0x640 || reg == 0x642 ||
 		  reg == 0x73 || reg == 0x75 || reg == 0x77 || reg == 0x79 ||
@@ -1829,11 +1851,6 @@ store_pwm_temp_sel(struct device *dev, struct device_attribute *attr,
 	unsigned long val;
 	int err;
 	int reg;
-	static const int max_src[] = {
-	    ARRAY_SIZE(nct6775_temp_label) - 1,
-	    ARRAY_SIZE(nct6776_temp_label) - 1,
-	    ARRAY_SIZE(nct6779_temp_label) - 1
-	};
 
 	err = kstrtoul(buf, 10, &val);
 	if (err < 0)
@@ -1841,7 +1858,7 @@ store_pwm_temp_sel(struct device *dev, struct device_attribute *attr,
 	if (val == 0 || val > 0x1f)
 		return -EINVAL;
 
-	val = SENSORS_LIMIT(val, 1, max_src[data->kind]);
+	val = SENSORS_LIMIT(val, 1, data->temp_label_num - 1);
 
 	if (!strlen(data->temp_label[val]))
 		return -EINVAL;
@@ -3049,6 +3066,9 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->fan_from_reg = fan_from_reg16;
 		data->fan_from_reg_min = fan_from_reg8;
 
+		data->temp_label = nct6775_temp_label;
+		data->temp_label_num = ARRAY_SIZE(nct6775_temp_label);
+
 		data->REG_CONFIG = NCT6775_REG_CONFIG;
 		data->REG_VBAT = NCT6775_REG_VBAT;
 		data->REG_DIODE = NCT6775_REG_DIODE;
@@ -3071,6 +3091,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_PWM_READ = NCT6775_REG_PWM_READ;
 		data->REG_PWM_MODE = NCT6775_REG_PWM_MODE;
 		data->PWM_MODE_MASK = NCT6775_PWM_MODE_MASK;
+		data->REG_TEMP_ALTERNATE = NCT6775_REG_TEMP_ALTERNATE;
 		data->REG_TEMP_MON = NCT6775_REG_TEMP_MON;
 		data->REG_AUTO_TEMP = NCT6775_REG_AUTO_TEMP;
 		data->REG_AUTO_PWM = NCT6775_REG_AUTO_PWM;
@@ -3105,6 +3126,9 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->fan_from_reg = fan_from_reg13;
 		data->fan_from_reg_min = fan_from_reg13;
 
+		data->temp_label = nct6776_temp_label;
+		data->temp_label_num = ARRAY_SIZE(nct6776_temp_label);
+
 		data->REG_CONFIG = NCT6775_REG_CONFIG;
 		data->REG_VBAT = NCT6775_REG_VBAT;
 		data->REG_DIODE = NCT6775_REG_DIODE;
@@ -3126,6 +3150,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_PWM_READ = NCT6775_REG_PWM_READ;
 		data->REG_PWM_MODE = NCT6776_REG_PWM_MODE;
 		data->PWM_MODE_MASK = NCT6776_PWM_MODE_MASK;
+		data->REG_TEMP_ALTERNATE = NCT6776_REG_TEMP_ALTERNATE;
 		data->REG_TEMP_MON = NCT6775_REG_TEMP_MON;
 		data->REG_AUTO_TEMP = NCT6775_REG_AUTO_TEMP;
 		data->REG_AUTO_PWM = NCT6775_REG_AUTO_PWM;
@@ -3160,6 +3185,9 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->fan_from_reg = fan_from_reg13;
 		data->fan_from_reg_min = fan_from_reg13;
 
+		data->temp_label = nct6779_temp_label;
+		data->temp_label_num = ARRAY_SIZE(nct6779_temp_label);
+
 		data->REG_CONFIG = NCT6775_REG_CONFIG;
 		data->REG_VBAT = NCT6775_REG_VBAT;
 		data->REG_DIODE = NCT6775_REG_DIODE;
@@ -3181,7 +3209,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_PWM_READ = NCT6775_REG_PWM_READ;
 		data->REG_PWM_MODE = NCT6776_REG_PWM_MODE;
 		data->PWM_MODE_MASK = NCT6776_PWM_MODE_MASK;
-		data->REG_TEMP_FIXED = NCT6779_REG_TEMP_FIXED;
+		data->REG_TEMP_ALTERNATE = NCT6779_REG_TEMP_ALTERNATE;
 		data->REG_TEMP_MON = NCT6775_REG_TEMP_MON;
 		data->REG_AUTO_TEMP = NCT6775_REG_AUTO_TEMP;
 		data->REG_AUTO_PWM = NCT6775_REG_AUTO_PWM;
@@ -3272,11 +3300,12 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		if (!src || (mask & (1 << src)))
 			continue;
 
+		mask |= 1 << src;
+
 		/* Use fixed index for SYSTIN(1), CPUTIN(2), AUXTIN(3) */
 		if (src <= data->temp_fixed_num) {
 			data->have_temp |= 1 << (src - 1);
 			data->have_temp_fixed |= 1 << (src - 1);
-			mask |= 1 << src;
 			data->reg_temp[0][src - 1] = reg_temp[i];
 			data->reg_temp[1][src - 1] = reg_temp_over[i];
 			data->reg_temp[2][src - 1] = reg_temp_hyst[i];
@@ -3290,8 +3319,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 
 		/* Use dynamic index for other sources */
 		data->have_temp |= 1 << s;
-		mask |= 1 << src;
-
 		data->reg_temp[0][s] = reg_temp[i];
 		data->reg_temp[1][s] = reg_temp_over[i];
 		data->reg_temp[2][s] = reg_temp_hyst[i];
@@ -3301,21 +3328,43 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		s++;
 	}
 
-	if (data->REG_TEMP_FIXED) {
-		for (i = 0; i < NUM_TEMP_FIXED; i++) {
-			if (data->have_temp & (1 << i))
+	/*
+	 * We may have alternate registers for some sensors.
+	 * Go through the list and enable if possible.
+	 * The temperature is already monitored if the respective bit in <mask>
+	 * is set.
+	 */
+	if (data->REG_TEMP_ALTERNATE) {
+		for (i = 0; i < data->temp_label_num; i++) {
+			if (!data->REG_TEMP_ALTERNATE[i])
 				continue;
-			if (!data->REG_TEMP_FIXED[i])
+		    	pr_info("Alternate index %d reg 0x%x source %s mask 0x%x have 0x%x s %d\n",
+				i, data->REG_TEMP_ALTERNATE[i],
+				data->temp_label[i + 1], mask,
+				data->have_temp, s);
+			if (mask & (1 << (i + 1)))
 				continue;
-			data->have_temp |= 1 << i;
-			data->reg_temp[0][i] = data->REG_TEMP_FIXED[i];
-			data->temp_src[i] = i + 1;
+			if (i < data->temp_fixed_num) {
+				if (data->have_temp & (1 << i))
+					continue;
+				data->have_temp |= 1 << i;
+				data->reg_temp[0][i] = data->REG_TEMP_ALTERNATE[i];
+				data->temp_src[i] = i + 1;
+				continue;
+			}
+
+			if (s >= NUM_TEMP)	/* Abort if no more space */
+				break;
+
+			data->have_temp |= 1 << s;
+			data->reg_temp[0][s] = data->REG_TEMP_ALTERNATE[i];
+			data->temp_src[s] = i + 1;
+			s++;
 		}
 	}
 
 	switch (data->kind) {
 	case nct6775:
-		data->temp_label = nct6775_temp_label;
 		break;
 	case nct6776:
 		/*
@@ -3335,7 +3384,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 			else
 				data->have_in &= ~(1 << 6);
 		}
-		data->temp_label = nct6776_temp_label;
 		break;
 	case nct6779:
 		/*
@@ -3359,7 +3407,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 			if (i == 5)				/* AUXTIN3 */
 				data->have_in &= ~(1 << 14);	/* no VIN7 */
 		}
-		data->temp_label = nct6779_temp_label;
 		break;
 	}
 
