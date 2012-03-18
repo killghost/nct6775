@@ -2852,6 +2852,8 @@ clear_caseopen(struct device *dev, struct device_attribute *attr,
 	reg = superio_inb(sio_data->sioreg, NCT6775_REG_CR_CASEOPEN_CLR[nr]);
 	reg |= NCT6775_CR_CASEOPEN_CLR_MASK[nr];
 	superio_outb(sio_data->sioreg, NCT6775_REG_CR_CASEOPEN_CLR[nr], reg);
+	reg &= ~NCT6775_CR_CASEOPEN_CLR_MASK[nr];
+	superio_outb(sio_data->sioreg, NCT6775_REG_CR_CASEOPEN_CLR[nr], reg);
 	superio_exit(sio_data->sioreg);
 
 	data->valid = 0;	/* Force cache refresh */
