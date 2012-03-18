@@ -135,6 +135,29 @@ This modes tries to keep the fan speed constant.
 Untested; use at your own risk.
 
 
+Usage Notes
+-----------
+
+On some motherboards with NCT6776F, temperature readings for CPUTIN and AUXTIN
+are not correct. In addition, the reported CPUTIN may be _lower_ if the CPU load
+increases.
+
+On an ASUS P8H67V board, the observed relationship between measured and real
+temperatures was approximately
+	T(cpu,real) = 80 - (T(cpu,measured) / 2)
+	T(aux,real) = T(aux,measured) - 30000
+if the thermal sensor type was set to "thermistor(4)".
+
+The reported value for CPUTIN sometimes jumps significantly, up to 10 degrees C
+between measurements. Changing the sensor types on that board to diode(1) or
+thermal diode (3) did not help.
+
+The problem with AUXTIN can possibly be addressed by setting temp3_offset to
+-30000. It is currently unknown, however, if the AUXTIN sensor is actually
+connected to anything. The CPUTIN sensor is obviously connected to something,
+but how the reported temperature relates to the real world is unknown. 
+
+
 Implementation Details
 ----------------------
 
