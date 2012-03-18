@@ -181,10 +181,38 @@ static const u16 NCT6779_REG_IN[] = {
 static const u16 NCT6775_REG_ALARM[6] = { 0x459, 0x45A, 0x45B };
 static const u16 NCT6779_REG_ALARM[6] = { 0x459, 0x45A, 0x45B, 0x568 };
 
-#define NCT6775_REG_CASEOPEN		0x42
+/* 0..15 voltages, 16..23 fans, 24..31 temperatures */
 
-static const u8 NCT6775_CASEOPEN_MASK[] = { 0x10, 0x00 };
-static const u8 NCT6776_CASEOPEN_MASK[] = { 0x10, 0x40 };
+static const s8 NCT6775_ALARM_BITS[]
+	= { 0, 1, 2, 3, 8, 21, 20, 16,		/* in0.. in7 */
+	    17, -1, -1, -1, -1, -1, -1,		/* in8..in14 */
+	    -1,					/* unused */
+	    6, 7, 11, 10, 23,			/* fan1..fan5 */
+	    -1, -1, -1,				/* unused */
+	    4, 5, 13, -1, -1, -1,		/* temp1..temp6 */
+	    12, -1 };				/* intrusion0, intrusion1 */
+
+static const s8 NCT6776_ALARM_BITS[]
+	= { 0, 1, 2, 3, 8, 21, 20, 16,		/* in0.. in7 */
+	    17, -1, -1, -1, -1, -1, -1,		/* in8..in14 */
+	    -1,					/* unused */
+	    6, 7, 11, 10, 23,			/* fan1..fan5 */
+	    -1, -1, -1,				/* unused */
+	    4, 5, 13, -1, -1, -1,		/* temp1..temp6 */
+	    12, 9 };				/* intrusion0, intrusion1 */
+
+static const s8 NCT6779_ALARM_BITS[]
+	= { 0, 1, 2, 3, 8, 21, 20, 16,		/* in0.. in7 */
+	    17, 24, 25, 26, 27, 28, 29,		/* in8..in14 */
+	    -1,					/* unused */
+	    6, 7, 11, 10, 23,			/* fan1..fan5 */
+	    -1, -1, -1,				/* unused */
+	    4, 5, 13, -1, -1, -1,		/* temp1..temp6 */
+	    12, 9 };				/* intrusion0, intrusion1 */
+
+#define FAN_ALARM_BASE		16
+#define TEMP_ALARM_BASE		24
+#define INTRUSION_ALARM_BASE	30
 
 static const u8 NCT6775_REG_CR_CASEOPEN_CLR[] = { 0xe6, 0xee };
 static const u8 NCT6775_CR_CASEOPEN_CLR_MASK[] = { 0x20, 0x01 };
@@ -492,6 +520,8 @@ struct nct6775_data {
 	u16 REG_VBAT;
 	u16 REG_DIODE;
 
+	const s8 *ALARM_BITS;
+
 	const u16 *REG_VIN;
 	const u16 *REG_IN_MINMAX[2];
 
@@ -527,9 +557,6 @@ struct nct6775_data {
 
 	const u16 *REG_ALARM;
 
-	u8 REG_CASEOPEN;
-	const u8 *CASEOPEN_MASK;
-
 	unsigned int (*fan_from_reg)(u16 reg, unsigned int divreg);
 	unsigned int (*fan_from_reg_min)(u16 reg, unsigned int divreg);
 
@@ -554,7 +581,6 @@ struct nct6775_data {
 	s8 temp_offset[NUM_TEMP_FIXED];
 	s16 temp[3][NUM_TEMP]; /* 0=temp, 1=temp_over, 2=temp_hyst */
 	u64 alarms;
-	u8 caseopen;
 
 	u8 pwm_num;	/* number of pwm */
 
@@ -979,8 +1005,6 @@ static struct nct6775_data *nct6775_update_device(struct device *dev)
 			data->alarms |= ((u64)alarm) << (i << 3);
 		}
 
-		data->caseopen = nct6775_read_value(data, data->REG_CASEOPEN);
-
 		data->last_updated = jiffies;
 		data->valid = 1;
 	}
@@ -1027,7 +1051,7 @@ show_alarm(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct nct6775_data *data = nct6775_update_device(dev);
 	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
-	int nr = sattr->index;
+	int nr = data->ALARM_BITS[sattr->index];
 	return sprintf(buf, "%u\n",
 		       (unsigned int)((data->alarms >> nr) & 0x01));
 }
@@ -1052,17 +1076,17 @@ static SENSOR_DEVICE_ATTR(in0_alarm, S_IRUGO, show_alarm, NULL, 0);
 static SENSOR_DEVICE_ATTR(in1_alarm, S_IRUGO, show_alarm, NULL, 1);
 static SENSOR_DEVICE_ATTR(in2_alarm, S_IRUGO, show_alarm, NULL, 2);
 static SENSOR_DEVICE_ATTR(in3_alarm, S_IRUGO, show_alarm, NULL, 3);
-static SENSOR_DEVICE_ATTR(in4_alarm, S_IRUGO, show_alarm, NULL, 8);
-static SENSOR_DEVICE_ATTR(in5_alarm, S_IRUGO, show_alarm, NULL, 21);
-static SENSOR_DEVICE_ATTR(in6_alarm, S_IRUGO, show_alarm, NULL, 20);
-static SENSOR_DEVICE_ATTR(in7_alarm, S_IRUGO, show_alarm, NULL, 16);
-static SENSOR_DEVICE_ATTR(in8_alarm, S_IRUGO, show_alarm, NULL, 17);
-static SENSOR_DEVICE_ATTR(in9_alarm, S_IRUGO, show_alarm, NULL, 24);
-static SENSOR_DEVICE_ATTR(in10_alarm, S_IRUGO, show_alarm, NULL, 25);
-static SENSOR_DEVICE_ATTR(in11_alarm, S_IRUGO, show_alarm, NULL, 26);
-static SENSOR_DEVICE_ATTR(in12_alarm, S_IRUGO, show_alarm, NULL, 27);
-static SENSOR_DEVICE_ATTR(in13_alarm, S_IRUGO, show_alarm, NULL, 28);
-static SENSOR_DEVICE_ATTR(in14_alarm, S_IRUGO, show_alarm, NULL, 29);
+static SENSOR_DEVICE_ATTR(in4_alarm, S_IRUGO, show_alarm, NULL, 4);
+static SENSOR_DEVICE_ATTR(in5_alarm, S_IRUGO, show_alarm, NULL, 5);
+static SENSOR_DEVICE_ATTR(in6_alarm, S_IRUGO, show_alarm, NULL, 6);
+static SENSOR_DEVICE_ATTR(in7_alarm, S_IRUGO, show_alarm, NULL, 7);
+static SENSOR_DEVICE_ATTR(in8_alarm, S_IRUGO, show_alarm, NULL, 8);
+static SENSOR_DEVICE_ATTR(in9_alarm, S_IRUGO, show_alarm, NULL, 9);
+static SENSOR_DEVICE_ATTR(in10_alarm, S_IRUGO, show_alarm, NULL, 10);
+static SENSOR_DEVICE_ATTR(in11_alarm, S_IRUGO, show_alarm, NULL, 11);
+static SENSOR_DEVICE_ATTR(in12_alarm, S_IRUGO, show_alarm, NULL, 12);
+static SENSOR_DEVICE_ATTR(in13_alarm, S_IRUGO, show_alarm, NULL, 13);
+static SENSOR_DEVICE_ATTR(in14_alarm, S_IRUGO, show_alarm, NULL, 14);
 
 static SENSOR_DEVICE_ATTR_2(in0_min, S_IWUSR | S_IRUGO, show_in_reg,
 			    store_in_reg, 0, 1);
@@ -1388,11 +1412,11 @@ static struct sensor_device_attribute sda_fan_input[] = {
 };
 
 static struct sensor_device_attribute sda_fan_alarm[] = {
-	SENSOR_ATTR(fan1_alarm, S_IRUGO, show_alarm, NULL, 6),
-	SENSOR_ATTR(fan2_alarm, S_IRUGO, show_alarm, NULL, 7),
-	SENSOR_ATTR(fan3_alarm, S_IRUGO, show_alarm, NULL, 11),
-	SENSOR_ATTR(fan4_alarm, S_IRUGO, show_alarm, NULL, 10),
-	SENSOR_ATTR(fan5_alarm, S_IRUGO, show_alarm, NULL, 23),
+	SENSOR_ATTR(fan1_alarm, S_IRUGO, show_alarm, NULL, FAN_ALARM_BASE),
+	SENSOR_ATTR(fan2_alarm, S_IRUGO, show_alarm, NULL, FAN_ALARM_BASE + 1),
+	SENSOR_ATTR(fan3_alarm, S_IRUGO, show_alarm, NULL, FAN_ALARM_BASE + 2),
+	SENSOR_ATTR(fan4_alarm, S_IRUGO, show_alarm, NULL, FAN_ALARM_BASE + 3),
+	SENSOR_ATTR(fan5_alarm, S_IRUGO, show_alarm, NULL, FAN_ALARM_BASE + 4),
 };
 
 static struct sensor_device_attribute sda_fan_min[] = {
@@ -1646,9 +1670,18 @@ static struct sensor_device_attribute sda_temp_type[] = {
 };
 
 static struct sensor_device_attribute sda_temp_alarm[] = {
-	SENSOR_ATTR(temp1_alarm, S_IRUGO, show_alarm, NULL, 4),
-	SENSOR_ATTR(temp2_alarm, S_IRUGO, show_alarm, NULL, 5),
-	SENSOR_ATTR(temp3_alarm, S_IRUGO, show_alarm, NULL, 13),
+	SENSOR_ATTR(temp1_alarm, S_IRUGO, show_alarm, NULL,
+		    TEMP_ALARM_BASE),
+	SENSOR_ATTR(temp2_alarm, S_IRUGO, show_alarm, NULL,
+		    TEMP_ALARM_BASE + 1),
+	SENSOR_ATTR(temp3_alarm, S_IRUGO, show_alarm, NULL,
+		    TEMP_ALARM_BASE + 2),
+	SENSOR_ATTR(temp4_alarm, S_IRUGO, show_alarm, NULL,
+		    TEMP_ALARM_BASE + 3),
+	SENSOR_ATTR(temp5_alarm, S_IRUGO, show_alarm, NULL,
+		    TEMP_ALARM_BASE + 4),
+	SENSOR_ATTR(temp6_alarm, S_IRUGO, show_alarm, NULL,
+		    TEMP_ALARM_BASE + 5),
 };
 
 #define NUM_TEMP_ALARM	ARRAY_SIZE(sda_temp_alarm)
@@ -2795,21 +2828,12 @@ static DEVICE_ATTR(cpu0_vid, S_IRUGO, show_vid, NULL);
 /* Case open detection */
 
 static ssize_t
-show_caseopen(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	struct nct6775_data *data = nct6775_update_device(dev);
-
-	return sprintf(buf, "%d\n",
-		!!(data->caseopen & to_sensor_dev_attr_2(attr)->index));
-}
-
-static ssize_t
 clear_caseopen(struct device *dev, struct device_attribute *attr,
 	       const char *buf, size_t count)
 {
 	struct nct6775_data *data = dev_get_drvdata(dev);
 	struct nct6775_sio_data *sio_data = dev->platform_data;
-	int nr = to_sensor_dev_attr(attr)->index;
+	int nr = to_sensor_dev_attr(attr)->index - INTRUSION_ALARM_BASE;
 	unsigned long val;
 	u8 reg;
 
@@ -2838,10 +2862,10 @@ clear_caseopen(struct device *dev, struct device_attribute *attr,
 }
 
 static struct sensor_device_attribute sda_caseopen[] = {
-	SENSOR_ATTR(intrusion0_alarm, S_IWUSR | S_IRUGO, show_caseopen,
-		    clear_caseopen, 0),
-	SENSOR_ATTR(intrusion1_alarm, S_IWUSR | S_IRUGO, show_caseopen,
-		    clear_caseopen, 1),
+	SENSOR_ATTR(intrusion0_alarm, S_IWUSR | S_IRUGO, show_alarm,
+		    clear_caseopen, INTRUSION_ALARM_BASE),
+	SENSOR_ATTR(intrusion1_alarm, S_IWUSR | S_IRUGO, show_alarm,
+		    clear_caseopen, INTRUSION_ALARM_BASE + 1),
 };
 
 /*
@@ -3065,6 +3089,8 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->has_fan_div = true;
 		data->temp_fixed_num = 3;
 
+		data->ALARM_BITS = NCT6775_ALARM_BITS;
+
 		data->fan_from_reg = fan_from_reg16;
 		data->fan_from_reg_min = fan_from_reg8;
 
@@ -3108,8 +3134,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_WEIGHT_TEMP[1] = NCT6775_REG_WEIGHT_TEMP_STEP_TOL;
 		data->REG_WEIGHT_TEMP[2] = NCT6775_REG_WEIGHT_TEMP_BASE;
 		data->REG_ALARM = NCT6775_REG_ALARM;
-		data->REG_CASEOPEN = NCT6775_REG_CASEOPEN;
-		data->CASEOPEN_MASK = NCT6775_CASEOPEN_MASK;
 
 		reg_temp = NCT6775_REG_TEMP;
 		reg_temp_over = NCT6775_REG_TEMP_OVER;
@@ -3124,6 +3148,8 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->auto_pwm_num = 4;
 		data->has_fan_div = false;
 		data->temp_fixed_num = 3;
+
+		data->ALARM_BITS = NCT6776_ALARM_BITS;
 
 		data->fan_from_reg = fan_from_reg13;
 		data->fan_from_reg_min = fan_from_reg13;
@@ -3167,8 +3193,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_WEIGHT_TEMP[1] = NCT6775_REG_WEIGHT_TEMP_STEP_TOL;
 		data->REG_WEIGHT_TEMP[2] = NCT6775_REG_WEIGHT_TEMP_BASE;
 		data->REG_ALARM = NCT6775_REG_ALARM;
-		data->REG_CASEOPEN = NCT6775_REG_CASEOPEN;
-		data->CASEOPEN_MASK = NCT6776_CASEOPEN_MASK;
 
 		reg_temp = NCT6775_REG_TEMP;
 		reg_temp_over = NCT6775_REG_TEMP_OVER;
@@ -3183,6 +3207,8 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->auto_pwm_num = 4;
 		data->has_fan_div = false;
 		data->temp_fixed_num = 6;
+
+		data->ALARM_BITS = NCT6779_ALARM_BITS;
 
 		data->fan_from_reg = fan_from_reg13;
 		data->fan_from_reg_min = fan_from_reg13;
@@ -3226,8 +3252,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_WEIGHT_TEMP[1] = NCT6775_REG_WEIGHT_TEMP_STEP_TOL;
 		data->REG_WEIGHT_TEMP[2] = NCT6775_REG_WEIGHT_TEMP_BASE;
 		data->REG_ALARM = NCT6779_REG_ALARM;
-		data->REG_CASEOPEN = NCT6775_REG_CASEOPEN;
-		data->CASEOPEN_MASK = NCT6776_CASEOPEN_MASK;
 
 		reg_temp = NCT6779_REG_TEMP;
 		reg_temp_over = NCT6775_REG_TEMP_OVER;
@@ -3560,7 +3584,8 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 					 &sda_temp_offset[i].dev_attr);
 		if (err)
 			goto exit_remove;
-		if (i >= NUM_TEMP_ALARM)
+		if (i >= NUM_TEMP_ALARM ||
+		    data->ALARM_BITS[TEMP_ALARM_BASE + i] < 0)
 			continue;
 		err = device_create_file(dev, &sda_temp_alarm[i].dev_attr);
 		if (err)
@@ -3568,7 +3593,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 	}
 
 	for (i = 0; i < ARRAY_SIZE(sda_caseopen); i++) {
-		if (!data->CASEOPEN_MASK[i])
+		if (data->ALARM_BITS[INTRUSION_ALARM_BASE + i] < 0)
 			continue;
 		err = device_create_file(dev, &sda_caseopen[i].dev_attr);
 		if (err)
