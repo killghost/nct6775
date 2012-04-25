@@ -226,6 +226,11 @@ static const u8 NCT6776_PWM_MODE_MASK[] = { 0x01, 0, 0 };
 
 /* Advanced Fan control, some values are common for all fans */
 
+static const u16 NCT6775_REG_FAN_PULSES[] = { 0x641, 0x642, 0x643, 0x644, 0 };
+static const u16 NCT6776_REG_FAN_PULSES[] = { 0x644, 0x645, 0x646, 0, 0 };
+static const u16 NCT6779_REG_FAN_PULSES[]
+	= { 0x644, 0x645, 0x646, 0x647, 0x648 };
+
 static const u16 NCT6775_REG_TARGET[] = { 0x101, 0x201, 0x301, 0x801, 0x901 };
 static const u16 NCT6775_REG_FAN_MODE[] = { 0x102, 0x202, 0x302, 0x802, 0x902 };
 static const u16 NCT6775_REG_FAN_STEP_DOWN_TIME[] = {
@@ -249,7 +254,7 @@ static const u16 NCT6775_REG_FAN[] = { 0x630, 0x632, 0x634, 0x636, 0x638 };
 static const u16 NCT6776_REG_FAN_MIN[] = { 0x63a, 0x63c, 0x63e, 0x640, 0x642};
 
 static const u16 NCT6779_REG_TOLERANCE_H[]
-	= { 0x10c, 0x20c, 0x30c, 0x40c, 0x50c };
+	= { 0x10c, 0x20c, 0x30c, 0x80c, 0x90c };
 
 static const u16 NCT6779_REG_FAN[] = { 0x4c0, 0x4c2, 0x4c4, 0x4c6, 0x4c8 };
 
