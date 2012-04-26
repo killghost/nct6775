@@ -3330,6 +3330,12 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		if (!src || (mask & (1 << src)))
 			continue;
 
+		if (src >= data->temp_label_num ||
+		    !strlen(data->temp_label[src])) {
+			dev_info(dev, "Invalid temperature source %d\n", src);
+			continue;
+		}
+
 		mask |= 1 << src;
 
 		/* Use fixed index for SYSTIN(1), CPUTIN(2), AUXTIN(3) */
