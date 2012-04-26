@@ -3090,7 +3090,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 	switch (data->kind) {
 	case nct6775:
 		data->in_num = 9;
-		data->have_in = 0x1ff;
 		data->pwm_num = 3;
 		data->auto_pwm_num = 6;
 		data->has_fan_div = true;
@@ -3150,7 +3149,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		break;
 	case nct6776:
 		data->in_num = 9;
-		data->have_in = 0x1ff;
 		data->pwm_num = 3;
 		data->auto_pwm_num = 4;
 		data->has_fan_div = false;
@@ -3209,7 +3207,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		break;
 	case nct6779:
 		data->in_num = 15;
-		data->have_in = 0x7fff;
 		data->pwm_num = 5;
 		data->auto_pwm_num = 4;
 		data->has_fan_div = false;
@@ -3270,7 +3267,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		err = -ENODEV;
 		goto exit_release;
 	}
-
+	data->have_in = (1 << data->in_num) - 1;
 	data->have_temp = 0;
 
 	/*
