@@ -1640,7 +1640,7 @@ static struct sensor_device_attribute_2 sda_temp_max_hyst[] = {
 		      7, 2),
 	SENSOR_ATTR_2(temp9_max_hyst, S_IRUGO | S_IWUSR, show_temp, store_temp,
 		      8, 2),
-	SENSOR_ATTR_2(temp9_max_hyst, S_IRUGO | S_IWUSR, show_temp, store_temp,
+	SENSOR_ATTR_2(temp10_max_hyst, S_IRUGO | S_IWUSR, show_temp, store_temp,
 		      9, 2),
 };
 
