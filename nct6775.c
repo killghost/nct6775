@@ -966,8 +966,8 @@ static struct nct6775_data *nct6775_update_device(struct device *dev)
 			    && (reg >= 0xff || (data->kind == nct6775
 						&& reg == 0x00))
 			    && data->fan_div[i] < 0x07) {
-				dev_dbg(dev, "Increasing fan%d "
-					"clock divider from %u to %u\n",
+				dev_dbg(dev,
+					"Increasing fan%d clock divider from %u to %u\n",
 					i + 1, div_from_reg(data->fan_div[i]),
 					div_from_reg(data->fan_div[i] + 1));
 				data->fan_div[i]++;
@@ -1358,9 +1358,9 @@ store_fan_min(struct device *dev, struct device_attribute *attr,
 		 */
 		data->fan_min[nr] = 254;
 		new_div = 7; /* 128 == (1 << 7) */
-		dev_warn(dev, "fan%u low limit %lu below minimum %u, set to "
-			 "minimum\n", nr + 1, val,
-			 data->fan_from_reg_min(254, 7));
+		dev_warn(dev,
+			 "fan%u low limit %lu below minimum %u, set to minimum\n",
+			 nr + 1, val, data->fan_from_reg_min(254, 7));
 	} else if (!reg) {
 		/*
 		 * Speed above this value cannot possibly be represented,
@@ -1368,9 +1368,9 @@ store_fan_min(struct device *dev, struct device_attribute *attr,
 		 */
 		data->fan_min[nr] = 1;
 		new_div = 0; /* 1 == (1 << 0) */
-		dev_warn(dev, "fan%u low limit %lu above maximum %u, set to "
-			 "maximum\n", nr + 1, val,
-			 data->fan_from_reg_min(1, 0));
+		dev_warn(dev,
+			 "fan%u low limit %lu above maximum %u, set to maximum\n",
+			 nr + 1, val, data->fan_from_reg_min(1, 0));
 	} else {
 		/*
 		 * Automatically pick the best divider, i.e. the one such
@@ -3378,7 +3378,8 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 				if (data->have_temp & (1 << i))
 					continue;
 				data->have_temp |= 1 << i;
-				data->reg_temp[0][i] = data->REG_TEMP_ALTERNATE[i];
+				data->reg_temp[0][i]
+				  = data->REG_TEMP_ALTERNATE[i];
 				data->temp_src[i] = i + 1;
 				continue;
 			}
@@ -3699,8 +3700,7 @@ static int __init nct6775_find(int sioaddr, unsigned short *addr,
 	/* Activate logical device if needed */
 	val = superio_inb(sioaddr, SIO_REG_ENABLE);
 	if (!(val & 0x01)) {
-		pr_warn("Forcibly enabling Super-I/O. "
-			"Sensor is probably unusable.\n");
+		pr_warn("Forcibly enabling Super-I/O. Sensor is probably unusable.\n");
 		superio_outb(sioaddr, SIO_REG_ENABLE, val | 0x01);
 	}
 
