@@ -399,7 +399,7 @@ static const char *const nct6779_temp_label[] = {
 	"BYTE_TEMP"
 };
 
-static const u16 NCT6775_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6779_temp_label)]
+static const u16 NCT6775_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6775_temp_label)]
 	= { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x661, 0x662, 0x664 };
 
 static const u16 NCT6776_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6776_temp_label)]
