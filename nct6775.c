@@ -3332,7 +3332,9 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 
 		if (src >= data->temp_label_num ||
 		    !strlen(data->temp_label[src])) {
-			dev_info(dev, "Invalid temperature source %d\n", src);
+			dev_info(dev,
+				 "Invalid temperature source %d at index %d, source register 0x%x, temp register 0x%x\n",
+				 src, i, data->REG_TEMP_SOURCE[i], reg_temp[i]);
 			continue;
 		}
 
