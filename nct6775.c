@@ -3471,7 +3471,8 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		}
 		superio_outb(sio_data->sioreg, NCT6775_REG_CR_FAN_DEBOUNCE,
 			     tmp);
-		pr_info("Enabled fan debounce for chip %s\n", data->name);
+		dev_info(&pdev->dev, "Enabled fan debounce for chip %s\n",
+			 data->name);
 	}
 
 	superio_exit(sio_data->sioreg);
@@ -3585,8 +3586,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		err = device_create_file(dev, &sda_temp_type[i].dev_attr);
 		if (err)
 			goto exit_remove;
-		err = device_create_file(dev,
-					 &sda_temp_offset[i].dev_attr);
+		err = device_create_file(dev, &sda_temp_offset[i].dev_attr);
 		if (err)
 			goto exit_remove;
 		if (i >= NUM_TEMP_ALARM ||
