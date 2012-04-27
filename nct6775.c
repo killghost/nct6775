@@ -3038,8 +3038,8 @@ nct6775_check_fan_inputs(const struct nct6775_sio_data *sio_data,
 		pwm4pin = !(regval & (1 << 1));
 		pwm5pin = !(regval & (1 << 2));
 
-		fan3min = 0;
-		fan4min = 0;
+		fan3min = fan3pin;
+		fan4min = fan4pin;
 	}
 
 	superio_exit(sio_data->sioreg);
