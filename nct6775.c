@@ -414,8 +414,6 @@ static const u16 NCT6779_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6779_temp_label) - 1]
 #define NUM_TEMP	10	/* Max number of temp attribute sets w/ limits*/
 #define NUM_TEMP_FIXED	6	/* Max number of fixed temp attribute sets */
 
-#define NUM_REG_TEMP	ARRAY_SIZE(NCT6775_REG_TEMP)
-
 static inline int reg_to_pwm_enable(int pwm, int mode)
 {
 	if (mode == 0 && pwm == 255)
@@ -3064,6 +3062,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 	int i, s, err = 0;
 	int src, mask, available;
 	const u16 *reg_temp, *reg_temp_over, *reg_temp_hyst, *reg_temp_config;
+	int num_reg_temp;
 
 	res = platform_get_resource(pdev, IORESOURCE_IO, 0);
 	if (!request_region(res->start, IOREGION_LENGTH, DRVNAME)) {
@@ -3143,6 +3142,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_ALARM = NCT6775_REG_ALARM;
 
 		reg_temp = NCT6775_REG_TEMP;
+		num_reg_temp = ARRAY_SIZE(NCT6775_REG_TEMP);
 		reg_temp_over = NCT6775_REG_TEMP_OVER;
 		reg_temp_hyst = NCT6775_REG_TEMP_HYST;
 		reg_temp_config = NCT6775_REG_TEMP_CONFIG;
@@ -3201,6 +3201,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_ALARM = NCT6775_REG_ALARM;
 
 		reg_temp = NCT6775_REG_TEMP;
+		num_reg_temp = ARRAY_SIZE(NCT6775_REG_TEMP);
 		reg_temp_over = NCT6775_REG_TEMP_OVER;
 		reg_temp_hyst = NCT6775_REG_TEMP_HYST;
 		reg_temp_config = NCT6776_REG_TEMP_CONFIG;
@@ -3259,6 +3260,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_ALARM = NCT6779_REG_ALARM;
 
 		reg_temp = NCT6779_REG_TEMP;
+		num_reg_temp = ARRAY_SIZE(NCT6779_REG_TEMP);
 		reg_temp_over = NCT6775_REG_TEMP_OVER;
 		reg_temp_hyst = NCT6775_REG_TEMP_HYST;
 		reg_temp_config = NCT6776_REG_TEMP_CONFIG;
@@ -3281,7 +3283,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 	 */
 	mask = 0;
 	available = 0;
-	for (i = 0; i < NUM_REG_TEMP; i++) {
+	for (i = 0; i < num_reg_temp; i++) {
 		if (reg_temp[i] == 0)
 			continue;
 
@@ -3330,7 +3332,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 
 	mask = 0;
 	s = NUM_TEMP_FIXED;	/* First dynamic temperature attribute */
-	for (i = 0; i < NUM_REG_TEMP; i++) {
+	for (i = 0; i < num_reg_temp; i++) {
 		if (reg_temp[i] == 0)
 			continue;
 
