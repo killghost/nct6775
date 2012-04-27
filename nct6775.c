@@ -399,16 +399,17 @@ static const char *const nct6779_temp_label[] = {
 	"BYTE_TEMP"
 };
 
-static const u16 NCT6775_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6775_temp_label)]
+static const u16 NCT6775_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6775_temp_label) - 1]
 	= { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x661, 0x662, 0x664 };
 
-static const u16 NCT6776_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6776_temp_label)]
+static const u16 NCT6776_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6776_temp_label) - 1]
 	= { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x401, 0x402, 0x404 };
 
-static const u16 NCT6779_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6779_temp_label)]
+static const u16 NCT6779_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6779_temp_label) - 1]
 	= { 0x490, 0x491, 0x492, 0x493, 0x494, 0x495, 0, 0,
 	    0, 0, 0, 0, 0, 0, 0, 0,
-	    0, 0, 0x401, 0x402, 0x404 };
+	    0, 0x400, 0x401, 0x402, 0x404, 0x405, 0x406, 0x407,
+	    0x408, 0 };
 
 #define NUM_TEMP	10	/* Max number of temp attribute sets w/ limits*/
 #define NUM_TEMP_FIXED	6	/* Max number of fixed temp attribute sets */
@@ -3310,6 +3311,13 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 			src &= 0x1f;
 			if (!src || (mask & (1 << src)))
 				continue;
+			if (src >= data->temp_label_num ||
+			    !strlen(data->temp_label[src])) {
+				dev_info(dev,
+					 "Select source %d:%d reg 0x%x invalid (%d)\n",
+					 i, j, data->REG_TEMP_SEL[i][j], src);
+				continue;
+			}
 
 			index = __ffs(available);
 			nct6775_write_value(data,
@@ -3374,7 +3382,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 	 * is set.
 	 */
 	if (data->REG_TEMP_ALTERNATE) {
-		for (i = 0; i < data->temp_label_num; i++) {
+		for (i = 0; i < data->temp_label_num - 1; i++) {
 			if (!data->REG_TEMP_ALTERNATE[i])
 				continue;
 			if (mask & (1 << (i + 1)))
