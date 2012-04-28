@@ -70,17 +70,13 @@ In this mode, the chip attempts to keep the measured temperature in a
 predefined temperature range. If the temperature goes out of range, fan
 is driven slower/faster to reach the predefined range again.
 
-The mode works for fan1-fan5. Mapping of temperatures to pwm outputs is as
-follows:
+The mode works for fan1-fan5.
 
-temp11 -> pwm1
-temp12 -> pwm2
-temp13 -> pwm3
-temp14 -> pwm4 (NCT6779D only)
-temp15 -> pwm5 (NCT6779D only)
-
-The temperature source used to control pwm1..pwm5 (temp11..temp15) can be
-configured with pwm[1..5]_temp_sel.
+The temperature source used to control pwm1..pwm5 can be configured with
+pwm[1..5]_temp_sel and pwm[1..5]_weight_temp_sel. The value reported and
+configured with those attributes is the temperature sensor attribute index.
+For example, to map the source of temp1_input to pwm1_temp_sel, write 1
+into the pwm1_temp_sel attribute.
 
 /sys files
 ----------
@@ -138,24 +134,14 @@ Untested; use at your own risk.
 Usage Notes
 -----------
 
-On some motherboards with NCT6776F, temperature readings for CPUTIN and AUXTIN
-are not correct. In addition, the reported CPUTIN may be _lower_ if the CPU load
+On various ASUS boards, it appears that CPUTIN is not really connected to
+anything and floats, or that it is connected to some non-standard temperature
+measurement device. As a result, the temperature reported on CPUTIN will not
+reflect a usable value. It often reports unreasonablyy high temperatures, and in
+some cases the reported temperature declines if the actual temperature
 increases.
-
-On an ASUS P8H67V board, the observed relationship between measured and real
-temperatures was approximately
-	T(cpu,real) = 80 - (T(cpu,measured) / 2)
-	T(aux,real) = T(aux,measured) - 30000
-if the thermal sensor type was set to "thermistor(4)".
-
-The reported value for CPUTIN sometimes jumps significantly, up to 10 degrees C
-between measurements. Changing the sensor types on that board to diode(1) or
-thermal diode (3) did not help.
-
-The problem with AUXTIN can possibly be addressed by setting temp3_offset to
--30000. It is currently unknown, however, if the AUXTIN sensor is actually
-connected to anything. The CPUTIN sensor is obviously connected to something,
-but how the reported temperature relates to the real world is unknown. 
+CPUTIN should therefore be be ignored on ASUS boards. The CPU temperature
+on ASUS boards is reported from PECI 0.
 
 
 Implementation Details
