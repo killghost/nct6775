@@ -153,8 +153,6 @@ superio_exit(int ioreg)
  * REG_CHIP_ID is at port 0x58
  */
 
-static const u16 NCT6775_REG_FAN_MIN[] = { 0x3b, 0x3c, 0x3d };
-
 /* Voltage min/max registers for nr=7..14 are in bank 5 */
 
 static const u16 NCT6775_REG_IN_MAX[] = {
@@ -252,13 +250,14 @@ static const u16 NCT6775_REG_PWM[] = { 0x109, 0x209, 0x309, 0x809, 0x909 };
 static const u16 NCT6775_REG_PWM_READ[] = { 0x01, 0x03, 0x11, 0x13, 0x15 };
 
 static const u16 NCT6775_REG_FAN[] = { 0x630, 0x632, 0x634, 0x636, 0x638 };
+static const u16 NCT6775_REG_FAN_MIN[] = { 0x3b, 0x3c, 0x3d };
 
 static const u16 NCT6776_REG_FAN_MIN[] = { 0x63a, 0x63c, 0x63e, 0x640, 0x642};
 
+static const u16 NCT6779_REG_FAN[] = { 0x4b0, 0x4b2, 0x4b4, 0x4b6, 0x4b8 };
+
 static const u16 NCT6779_REG_TOLERANCE_H[]
 	= { 0x10c, 0x20c, 0x30c, 0x80c, 0x90c };
-
-static const u16 NCT6779_REG_FAN[] = { 0x4b0, 0x4b2, 0x4b4, 0x4b6, 0x4b8 };
 
 static const u16 NCT6775_REG_TEMP[]
 	= { 0x27, 0x150, 0x250, 0x62b, 0x62c, 0x62d };
@@ -963,9 +962,7 @@ static struct nct6775_data *nct6775_update_device(struct device *dev)
 			 * divider can be increased, let's try that for next
 			 * time
 			 */
-			if (data->has_fan_div
-			    && (reg >= 0xff || (data->kind == nct6775
-						&& reg == 0x00))
+			if (data->has_fan_div && (reg >= 0xff || reg == 0x00)
 			    && data->fan_div[i] < 0x07) {
 				dev_dbg(dev,
 					"Increasing fan%d clock divider from %u to %u\n",
@@ -1329,10 +1326,7 @@ store_fan_min(struct device *dev, struct device_attribute *attr,
 
 	mutex_lock(&data->update_lock);
 	if (!data->has_fan_div) {
-		/*
-		 * Only NCT6776F for now, so we know that this is a 13 bit
-		 * register
-		 */
+		/* NCT6776F or NCT6779D; we know this is a 13 bit register */
 		if (!val) {
 			val = 0xff1f;
 		} else {
@@ -1402,8 +1396,7 @@ write_div:
 	}
 
 write_min:
-	nct6775_write_value(data, data->REG_FAN_MIN[nr],
-			      data->fan_min[nr]);
+	nct6775_write_value(data, data->REG_FAN_MIN[nr], data->fan_min[nr]);
 	mutex_unlock(&data->update_lock);
 
 	return count;
