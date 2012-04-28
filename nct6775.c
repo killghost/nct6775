@@ -153,8 +153,6 @@ superio_exit(int ioreg)
  * REG_CHIP_ID is at port 0x58
  */
 
-static const u16 NCT6775_REG_FAN_MIN[] = { 0x3b, 0x3c, 0x3d };
-
 /* Voltage min/max registers for nr=7..14 are in bank 5 */
 
 static const u16 NCT6775_REG_IN_MAX[] = {
@@ -251,14 +249,16 @@ static const u16 NCT6775_REG_FAN_STOP_TIME[]
 static const u16 NCT6775_REG_PWM[] = { 0x109, 0x209, 0x309, 0x809, 0x909 };
 static const u16 NCT6775_REG_PWM_READ[] = { 0x01, 0x03, 0x11, 0x13, 0x15 };
 
-static const u16 NCT6775_REG_FAN[] = { 0x630, 0x632, 0x634, 0x636, 0x638 };
+static const u16 NCT6775_REG_FAN[] = { 0x656, 0x658, 0x65a, 0x65c, 0x65e };
+
+static const u16 NCT6775_REG_FAN_MIN[] = { 0x3b, 0x3c, 0x3d };
 
 static const u16 NCT6776_REG_FAN_MIN[] = { 0x63a, 0x63c, 0x63e, 0x640, 0x642};
 
+static const u16 NCT6779_REG_FAN[] = { 0x4c0, 0x4c2, 0x4c4, 0x4c6, 0x4c8 };
+
 static const u16 NCT6779_REG_TOLERANCE_H[]
 	= { 0x10c, 0x20c, 0x30c, 0x80c, 0x90c };
-
-static const u16 NCT6779_REG_FAN[] = { 0x4b0, 0x4b2, 0x4b4, 0x4b6, 0x4b8 };
 
 static const u16 NCT6775_REG_TEMP[]
 	= { 0x27, 0x150, 0x250, 0x62b, 0x62c, 0x62d };
@@ -466,18 +466,6 @@ static unsigned int fan_from_reg13(u16 reg, unsigned int divreg)
 	return 1350000U / reg;
 }
 
-static unsigned int fan_from_reg16(u16 reg, unsigned int divreg)
-{
-	if (reg == 0 || reg == 0xffff)
-		return 0;
-
-	/*
-	 * Even though the registers are 16 bit wide, the fan divisor
-	 * still applies.
-	 */
-	return 1350000U / (reg << divreg);
-}
-
 static inline unsigned int
 div_from_reg(u8 reg)
 {
@@ -563,7 +551,6 @@ struct nct6775_data {
 
 	const u16 *REG_ALARM;
 
-	unsigned int (*fan_from_reg)(u16 reg, unsigned int divreg);
 	unsigned int (*fan_from_reg_min)(u16 reg, unsigned int divreg);
 
 	struct mutex update_lock;
@@ -663,6 +650,7 @@ static bool is_word_sized(struct nct6775_data *data, u16 reg)
 	case nct6779:
 		return reg == 0x150 || reg == 0x153 || reg == 0x155 ||
 		  ((reg & 0xfff0) == 0x4b0 && (reg & 0x000f) < 0x09) ||
+		  ((reg & 0xfff0) == 0x4c0 && (reg & 0x000f) < 0x09) ||
 		  reg == 0x402 ||
 		  reg == 0x63a || reg == 0x63c || reg == 0x63e ||
 		  reg == 0x640 || reg == 0x642 ||
@@ -945,28 +933,24 @@ static struct nct6775_data *nct6775_update_device(struct device *dev)
 
 		/* Measured fan speeds and limits */
 		for (i = 0; i < 5; i++) {
-			u16 reg;
 
 			if (!(data->has_fan & (1 << i)))
 				continue;
 
-			reg = nct6775_read_value(data, data->REG_FAN[i]);
-			data->rpm[i] = data->fan_from_reg(reg,
-							  data->fan_div[i]);
+			data->rpm[i] = nct6775_read_value(data,
+							  data->REG_FAN[i]);
 
 			if (data->has_fan_min & (1 << i))
 				data->fan_min[i] = nct6775_read_value(data,
 					   data->REG_FAN_MIN[i]);
 
 			/*
-			 * If we failed to measure the fan speed and clock
+			 * If we failed to measure the fan speed and the clock
 			 * divider can be increased, let's try that for next
-			 * time
+			 * time.
 			 */
-			if (data->has_fan_div
-			    && (reg >= 0xff || (data->kind == nct6775
-						&& reg == 0x00))
-			    && data->fan_div[i] < 0x07) {
+			if (data->has_fan_div && data->rpm[i] == 0 &&
+			    data->fan_div[i] < 0x07) {
 				dev_dbg(dev,
 					"Increasing fan%d clock divider from %u to %u\n",
 					i + 1, div_from_reg(data->fan_div[i]),
@@ -1329,10 +1313,7 @@ store_fan_min(struct device *dev, struct device_attribute *attr,
 
 	mutex_lock(&data->update_lock);
 	if (!data->has_fan_div) {
-		/*
-		 * Only NCT6776F for now, so we know that this is a 13 bit
-		 * register
-		 */
+		/* NCT6776F or NCT6779D; we know this is a 13 bit register */
 		if (!val) {
 			val = 0xff1f;
 		} else {
@@ -1402,8 +1383,7 @@ write_div:
 	}
 
 write_min:
-	nct6775_write_value(data, data->REG_FAN_MIN[nr],
-			      data->fan_min[nr]);
+	nct6775_write_value(data, data->REG_FAN_MIN[nr], data->fan_min[nr]);
 	mutex_unlock(&data->update_lock);
 
 	return count;
@@ -3099,7 +3079,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 
 		data->ALARM_BITS = NCT6775_ALARM_BITS;
 
-		data->fan_from_reg = fan_from_reg16;
 		data->fan_from_reg_min = fan_from_reg8;
 
 		data->temp_label = nct6775_temp_label;
@@ -3159,7 +3138,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 
 		data->ALARM_BITS = NCT6776_ALARM_BITS;
 
-		data->fan_from_reg = fan_from_reg13;
 		data->fan_from_reg_min = fan_from_reg13;
 
 		data->temp_label = nct6776_temp_label;
@@ -3218,7 +3196,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 
 		data->ALARM_BITS = NCT6779_ALARM_BITS;
 
-		data->fan_from_reg = fan_from_reg13;
 		data->fan_from_reg_min = fan_from_reg13;
 
 		data->temp_label = nct6779_temp_label;
