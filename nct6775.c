@@ -412,6 +412,15 @@ static const u16 NCT6779_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6779_temp_label) - 1]
 	    0, 0x400, 0x401, 0x402, 0x404, 0x405, 0x406, 0x407,
 	    0x408, 0 };
 
+static const u16 NCT6775_REG_TEMP_CRIT[ARRAY_SIZE(nct6775_temp_label) - 1]
+	= { 0, 0, 0, 0, 0xa00, 0xa01, 0xa02, 0xa03, 0xa04, 0xa05, 0xa06, 0xa07 };
+
+static const u16 NCT6776_REG_TEMP_CRIT[ARRAY_SIZE(nct6776_temp_label) - 1]
+	= { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x709, 0x70a };
+
+static const u16 NCT6779_REG_TEMP_CRIT[ARRAY_SIZE(nct6779_temp_label) - 1]
+	= { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x709, 0x70a };
+
 #define NUM_TEMP	10	/* Max number of temp attribute sets w/ limits*/
 #define NUM_TEMP_FIXED	6	/* Max number of fixed temp attribute sets */
 
@@ -515,7 +524,9 @@ struct nct6775_data {
 	struct device *hwmon_dev;
 	struct mutex lock;
 
-	u16 reg_temp[3][NUM_TEMP]; /* 0=temp, 1=temp_over, 2=temp_hyst */
+	u16 reg_temp[4][NUM_TEMP]; /* 0=temp, 1=temp_over, 2=temp_hyst,
+				    * 3=temp_crit
+				    */
 	u8 temp_src[NUM_TEMP];
 	u16 reg_temp_config[NUM_TEMP];
 	const char * const *temp_label;
@@ -986,7 +997,7 @@ static struct nct6775_data *nct6775_update_device(struct device *dev)
 		for (i = 0; i < NUM_TEMP; i++) {
 			if (!(data->have_temp & (1 << i)))
 				continue;
-			for (j = 0; j < 3; j++) {
+			for (j = 0; j < 4; j++) {
 				if (data->reg_temp[j][i])
 					data->temp[j][i]
 					  = nct6775_read_temp(data,
@@ -1635,6 +1646,29 @@ static struct sensor_device_attribute_2 sda_temp_max_hyst[] = {
 		      8, 2),
 	SENSOR_ATTR_2(temp10_max_hyst, S_IRUGO | S_IWUSR, show_temp, store_temp,
 		      9, 2),
+};
+
+static struct sensor_device_attribute_2 sda_temp_crit[] = {
+	SENSOR_ATTR_2(temp1_crit, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      0, 3),
+	SENSOR_ATTR_2(temp2_crit, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      1, 3),
+	SENSOR_ATTR_2(temp3_crit, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      2, 3),
+	SENSOR_ATTR_2(temp4_crit, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      3, 3),
+	SENSOR_ATTR_2(temp5_crit, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      4, 3),
+	SENSOR_ATTR_2(temp6_crit, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      5, 3),
+	SENSOR_ATTR_2(temp7_crit, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      6, 3),
+	SENSOR_ATTR_2(temp8_crit, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      7, 3),
+	SENSOR_ATTR_2(temp9_crit, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      8, 3),
+	SENSOR_ATTR_2(temp10_crit, S_IRUGO | S_IWUSR, show_temp, store_temp,
+		      9, 3),
 };
 
 static struct sensor_device_attribute sda_temp_offset[] = {
@@ -2912,6 +2946,7 @@ static void nct6775_device_remove_files(struct device *dev)
 		device_remove_file(dev, &sda_temp_label[i].dev_attr);
 		device_remove_file(dev, &sda_temp_max[i].dev_attr);
 		device_remove_file(dev, &sda_temp_max_hyst[i].dev_attr);
+		device_remove_file(dev, &sda_temp_crit[i].dev_attr);
 		if (!(data->have_temp_fixed & (1 << i)))
 			continue;
 		device_remove_file(dev, &sda_temp_type[i].dev_attr);
@@ -3056,7 +3091,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 	int i, s, err = 0;
 	int src, mask, available;
 	const u16 *reg_temp, *reg_temp_over, *reg_temp_hyst, *reg_temp_config;
-	const u16 *reg_temp_alternate;
+	const u16 *reg_temp_alternate, *reg_temp_crit;
 	int num_reg_temp;
 
 	res = platform_get_resource(pdev, IORESOURCE_IO, 0);
@@ -3141,6 +3176,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		reg_temp_hyst = NCT6775_REG_TEMP_HYST;
 		reg_temp_config = NCT6775_REG_TEMP_CONFIG;
 		reg_temp_alternate = NCT6775_REG_TEMP_ALTERNATE;
+		reg_temp_crit = NCT6775_REG_TEMP_CRIT;
 
 		break;
 	case nct6776:
@@ -3200,6 +3236,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		reg_temp_hyst = NCT6775_REG_TEMP_HYST;
 		reg_temp_config = NCT6776_REG_TEMP_CONFIG;
 		reg_temp_alternate = NCT6776_REG_TEMP_ALTERNATE;
+		reg_temp_crit = NCT6776_REG_TEMP_CRIT;
 
 		break;
 	case nct6779:
@@ -3259,6 +3296,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		reg_temp_hyst = NCT6775_REG_TEMP_HYST;
 		reg_temp_config = NCT6776_REG_TEMP_CONFIG;
 		reg_temp_alternate = NCT6779_REG_TEMP_ALTERNATE;
+		reg_temp_crit = NCT6779_REG_TEMP_CRIT;
 
 		break;
 	default:
@@ -3366,6 +3404,8 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->reg_temp[1][s] = reg_temp_over[i];
 		data->reg_temp[2][s] = reg_temp_hyst[i];
 		data->reg_temp_config[s] = reg_temp_config[i];
+		if (reg_temp_crit[src - 1])
+			data->reg_temp[3][s] = reg_temp_crit[src - 1];
 
 		data->temp_src[s] = src;
 		s++;
@@ -3588,6 +3628,12 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		if (data->reg_temp[2][i]) {
 			err = device_create_file(dev,
 					&sda_temp_max_hyst[i].dev_attr);
+			if (err)
+				goto exit_remove;
+		}
+		if (data->reg_temp[3][i]) {
+			err = device_create_file(dev,
+						 &sda_temp_crit[i].dev_attr);
 			if (err)
 				goto exit_remove;
 		}
