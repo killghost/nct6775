@@ -545,7 +545,6 @@ struct nct6775_data {
 				 */
 	const u16 *REG_PWM_READ;
 
-	const u16 *REG_TEMP_ALTERNATE;
 	const u16 *REG_TEMP_MON;
 	const u16 *REG_AUTO_TEMP;
 	const u16 *REG_AUTO_PWM;
@@ -3057,6 +3056,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 	int i, s, err = 0;
 	int src, mask, available;
 	const u16 *reg_temp, *reg_temp_over, *reg_temp_hyst, *reg_temp_config;
+	const u16 *reg_temp_alternate;
 	int num_reg_temp;
 
 	res = platform_get_resource(pdev, IORESOURCE_IO, 0);
@@ -3120,7 +3120,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_PWM_READ = NCT6775_REG_PWM_READ;
 		data->REG_PWM_MODE = NCT6775_REG_PWM_MODE;
 		data->PWM_MODE_MASK = NCT6775_PWM_MODE_MASK;
-		data->REG_TEMP_ALTERNATE = NCT6775_REG_TEMP_ALTERNATE;
 		data->REG_TEMP_MON = NCT6775_REG_TEMP_MON;
 		data->REG_AUTO_TEMP = NCT6775_REG_AUTO_TEMP;
 		data->REG_AUTO_PWM = NCT6775_REG_AUTO_PWM;
@@ -3141,6 +3140,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		reg_temp_over = NCT6775_REG_TEMP_OVER;
 		reg_temp_hyst = NCT6775_REG_TEMP_HYST;
 		reg_temp_config = NCT6775_REG_TEMP_CONFIG;
+		reg_temp_alternate = NCT6775_REG_TEMP_ALTERNATE;
 
 		break;
 	case nct6776:
@@ -3179,7 +3179,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_PWM_READ = NCT6775_REG_PWM_READ;
 		data->REG_PWM_MODE = NCT6776_REG_PWM_MODE;
 		data->PWM_MODE_MASK = NCT6776_PWM_MODE_MASK;
-		data->REG_TEMP_ALTERNATE = NCT6776_REG_TEMP_ALTERNATE;
 		data->REG_TEMP_MON = NCT6775_REG_TEMP_MON;
 		data->REG_AUTO_TEMP = NCT6775_REG_AUTO_TEMP;
 		data->REG_AUTO_PWM = NCT6775_REG_AUTO_PWM;
@@ -3200,6 +3199,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		reg_temp_over = NCT6775_REG_TEMP_OVER;
 		reg_temp_hyst = NCT6775_REG_TEMP_HYST;
 		reg_temp_config = NCT6776_REG_TEMP_CONFIG;
+		reg_temp_alternate = NCT6776_REG_TEMP_ALTERNATE;
 
 		break;
 	case nct6779:
@@ -3238,7 +3238,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_PWM_READ = NCT6775_REG_PWM_READ;
 		data->REG_PWM_MODE = NCT6776_REG_PWM_MODE;
 		data->PWM_MODE_MASK = NCT6776_PWM_MODE_MASK;
-		data->REG_TEMP_ALTERNATE = NCT6779_REG_TEMP_ALTERNATE;
 		data->REG_TEMP_MON = NCT6775_REG_TEMP_MON;
 		data->REG_AUTO_TEMP = NCT6775_REG_AUTO_TEMP;
 		data->REG_AUTO_PWM = NCT6775_REG_AUTO_PWM;
@@ -3259,6 +3258,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		reg_temp_over = NCT6775_REG_TEMP_OVER;
 		reg_temp_hyst = NCT6775_REG_TEMP_HYST;
 		reg_temp_config = NCT6776_REG_TEMP_CONFIG;
+		reg_temp_alternate = NCT6779_REG_TEMP_ALTERNATE;
 
 		break;
 	default:
@@ -3373,35 +3373,32 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 
 #ifdef TESTING
 	/*
-	 * We may have alternate registers for some sensors.
-	 * Go through the list and enable if possible.
+	 * Go through the list of alternate temp registers and enable
+	 * if possible.
 	 * The temperature is already monitored if the respective bit in <mask>
 	 * is set.
 	 */
-	if (data->REG_TEMP_ALTERNATE) {
-		for (i = 0; i < data->temp_label_num - 1; i++) {
-			if (!data->REG_TEMP_ALTERNATE[i])
+	for (i = 0; i < data->temp_label_num - 1; i++) {
+		if (!reg_temp_alternate[i])
+			continue;
+		if (mask & (1 << (i + 1)))
+			continue;
+		if (i < data->temp_fixed_num) {
+			if (data->have_temp & (1 << i))
 				continue;
-			if (mask & (1 << (i + 1)))
-				continue;
-			if (i < data->temp_fixed_num) {
-				if (data->have_temp & (1 << i))
-					continue;
-				data->have_temp |= 1 << i;
-				data->reg_temp[0][i]
-				  = data->REG_TEMP_ALTERNATE[i];
-				data->temp_src[i] = i + 1;
-				continue;
-			}
-
-			if (s >= NUM_TEMP)	/* Abort if no more space */
-				break;
-
-			data->have_temp |= 1 << s;
-			data->reg_temp[0][s] = data->REG_TEMP_ALTERNATE[i];
-			data->temp_src[s] = i + 1;
-			s++;
+			data->have_temp |= 1 << i;
+			data->reg_temp[0][i] = reg_temp_alternate[i];
+			data->temp_src[i] = i + 1;
+			continue;
 		}
+
+		if (s >= NUM_TEMP)	/* Abort if no more space */
+			break;
+
+		data->have_temp |= 1 << s;
+		data->reg_temp[0][s] = reg_temp_alternate[i];
+		data->temp_src[s] = i + 1;
+		s++;
 	}
 #endif /* TESTING */
 
