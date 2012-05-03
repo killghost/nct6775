@@ -270,6 +270,11 @@ static const u16 NCT6775_REG_TEMP_HYST[]
 static const u16 NCT6775_REG_TEMP_OVER[]
 	= { 0x39, 0x155, 0x255, 0x672, 0x677, 0x67C };
 
+static const u16 NCT6779_REG_TEMP_HYST[]
+	= { 0x3a, 0x153, 0, 0, 0, 0 };
+static const u16 NCT6779_REG_TEMP_OVER[]
+	= { 0x39, 0x155, 0, 0, 0, 0 };
+
 static const u16 NCT6775_REG_TEMP_SOURCE[]
 	= { 0x621, 0x622, 0x623, 0x624, 0x625, 0x626 };
 
@@ -297,6 +302,8 @@ static const u16 NCT6779_REG_TEMP_OFFSET[]
 
 static const u16 NCT6776_REG_TEMP_CONFIG[11]
 	= { 0x18, 0x152, 0x252, 0x628, 0x629, 0x62A };
+
+static const u16 NCT6779_REG_TEMP_CONFIG[11] = { 0x18, 0x152 };
 
 static const u16 NCT6775_REG_TEMP_MON[] = { 0x73, 0x75, 0x77, 0x79, 0x7b };
 
@@ -3279,9 +3286,9 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 
 		reg_temp = NCT6779_REG_TEMP;
 		num_reg_temp = ARRAY_SIZE(NCT6779_REG_TEMP);
-		reg_temp_over = NCT6775_REG_TEMP_OVER;
-		reg_temp_hyst = NCT6775_REG_TEMP_HYST;
-		reg_temp_config = NCT6776_REG_TEMP_CONFIG;
+		reg_temp_over = NCT6779_REG_TEMP_OVER;
+		reg_temp_hyst = NCT6779_REG_TEMP_HYST;
+		reg_temp_config = NCT6779_REG_TEMP_CONFIG;
 		reg_temp_alternate = NCT6779_REG_TEMP_ALTERNATE;
 		reg_temp_crit = NCT6779_REG_TEMP_CRIT;
 
@@ -3414,7 +3421,10 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 			if (data->have_temp & (1 << i))
 				continue;
 			data->have_temp |= 1 << i;
+			data->have_temp_fixed |= 1 << i;
 			data->reg_temp[0][i] = reg_temp_alternate[i];
+			data->reg_temp[1][i] = reg_temp_over[i];
+			data->reg_temp[2][i] = reg_temp_hyst[i];
 			data->temp_src[i] = i + 1;
 			continue;
 		}
@@ -3458,21 +3468,11 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		 *	VIN5 / AUXTIN1
 		 *	VIN6 / AUXTIN2
 		 *	VIN7 / AUXTIN3
-		 * Assume voltage is disabled if the respective temperature is
-		 * used as temperature source.
+		 *
+		 * There does not seem to be a clean way to detect if VINx or
+		 * AUXTINx is active, so for keep both sensor types enabled
+		 * for now.
 		 */
-		for (i = 0; i < ARRAY_SIZE(NCT6779_REG_TEMP); i++) {
-			if (!(data->have_temp & (1 << i)))
-				continue;
-			if (i == 2)				/* AUXTIN0 */
-				data->have_in &= ~(1 << 6);	/* no VIN4 */
-			if (i == 3)				/* AUXTIN1 */
-				data->have_in &= ~(1 << 10);	/* no VIN5 */
-			if (i == 4)				/* AUXTIN2 */
-				data->have_in &= ~(1 << 11);	/* no VIN6 */
-			if (i == 5)				/* AUXTIN3 */
-				data->have_in &= ~(1 << 14);	/* no VIN7 */
-		}
 		break;
 	}
 
