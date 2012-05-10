@@ -3089,20 +3089,14 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 	int num_reg_temp;
 
 	res = platform_get_resource(pdev, IORESOURCE_IO, 0);
-	if (!request_region(res->start, IOREGION_LENGTH, DRVNAME)) {
-		err = -EBUSY;
-		dev_err(dev, "Failed to request region 0x%lx-0x%lx\n",
-			(unsigned long)res->start,
-			(unsigned long)res->start + IOREGION_LENGTH - 1);
-		goto exit;
-	}
+	if (!devm_request_region(&pdev->dev, res->start, IOREGION_LENGTH,
+				 DRVNAME))
+		return -EBUSY;
 
 	data = devm_kzalloc(&pdev->dev, sizeof(struct nct6775_data),
 			    GFP_KERNEL);
-	if (!data) {
-		err = -ENOMEM;
-		goto exit_release;
-	}
+	if (!data)
+		return -ENOMEM;
 
 	data->kind = sio_data->kind;
 	data->addr = res->start;
@@ -3294,8 +3288,7 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 
 		break;
 	default:
-		err = -ENODEV;
-		goto exit_release;
+		return -ENODEV;
 	}
 	data->have_in = (1 << data->in_num) - 1;
 	data->have_temp = 0;
@@ -3487,9 +3480,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 	 */
 	superio_select(sio_data->sioreg, NCT6775_LD_VID);
 	data->vid = superio_inb(sio_data->sioreg, 0xe3);
-	err = device_create_file(dev, &dev_attr_cpu0_vid);
-	if (err)
-		goto exit_release;
 
 	if (fan_debounce) {
 		u8 tmp;
@@ -3513,6 +3503,10 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 	}
 
 	superio_exit(sio_data->sioreg);
+
+	err = device_create_file(dev, &dev_attr_cpu0_vid);
+	if (err)
+		return err;
 
 	nct6775_check_fan_inputs(sio_data, data);
 
@@ -3662,9 +3656,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 
 exit_remove:
 	nct6775_device_remove_files(dev);
-exit_release:
-	release_region(res->start, IOREGION_LENGTH);
-exit:
 	return err;
 }
 
@@ -3674,7 +3665,6 @@ static int __devexit nct6775_remove(struct platform_device *pdev)
 
 	hwmon_device_unregister(data->hwmon_dev);
 	nct6775_device_remove_files(&pdev->dev);
-	release_region(data->addr, IOREGION_LENGTH);
 
 	return 0;
 }
