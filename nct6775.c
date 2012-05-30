@@ -3682,9 +3682,9 @@ static struct platform_driver nct6775_driver = {
 static int __init nct6775_find(int sioaddr, unsigned short *addr,
 			       struct nct6775_sio_data *sio_data)
 {
-	static const char __initdata sio_name_NCT6775[] = "NCT6775F";
-	static const char __initdata sio_name_NCT6776[] = "NCT6776F";
-	static const char __initdata sio_name_NCT6779[] = "NCT6779D";
+	static const char sio_name_NCT6775[] __initconst = "NCT6775F";
+	static const char sio_name_NCT6776[] __initconst = "NCT6776F";
+	static const char sio_name_NCT6779[] __initconst = "NCT6779D";
 
 	u16 val;
 	const char *sio_name;
