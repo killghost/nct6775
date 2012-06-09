@@ -117,11 +117,19 @@ superio_select(int ioreg, int ld)
 	outb(ld, ioreg + 1);
 }
 
-static inline void
+static inline int
 superio_enter(int ioreg)
 {
+	/*
+	 * Try to reserve <ioreg> and <ioreg + 1> for exclusive access.
+	 */
+        if (!request_muxed_region(ioreg, 2, DRVNAME))
+		return -EBUSY;
+
 	outb(0x87, ioreg);
 	outb(0x87, ioreg);
+
+	return 0;
 }
 
 static inline void
@@ -130,6 +138,7 @@ superio_exit(int ioreg)
 	outb(0xaa, ioreg);
 	outb(0x02, ioreg);
 	outb(0x02, ioreg + 1);
+	release_region(ioreg, 2);
 }
 
 /*
@@ -2862,6 +2871,7 @@ clear_caseopen(struct device *dev, struct device_attribute *attr,
 	int nr = to_sensor_dev_attr(attr)->index - INTRUSION_ALARM_BASE;
 	unsigned long val;
 	u8 reg;
+	int ret;
 
 	if (kstrtoul(buf, 10, &val) || val != 0)
 		return -EINVAL;
@@ -2873,7 +2883,10 @@ clear_caseopen(struct device *dev, struct device_attribute *attr,
 	 * The CR registers are the same for all chips, and not all chips
 	 * support clearing the caseopen status through "regular" registers.
 	 */
-	superio_enter(sio_data->sioreg);
+	ret = superio_enter(sio_data->sioreg);
+	if (ret)
+		goto error;
+
 	superio_select(sio_data->sioreg, NCT6775_LD_ACPI);
 	reg = superio_inb(sio_data->sioreg, NCT6775_REG_CR_CASEOPEN_CLR[nr]);
 	reg |= NCT6775_CR_CASEOPEN_CLR_MASK[nr];
@@ -2883,10 +2896,11 @@ clear_caseopen(struct device *dev, struct device_attribute *attr,
 	superio_exit(sio_data->sioreg);
 
 	data->valid = 0;	/* Force cache refresh */
-
+	ret = count;
+error:
 	mutex_unlock(&data->update_lock);
 
-	return count;
+	return ret;
 }
 
 static struct sensor_device_attribute sda_caseopen[] = {
@@ -2999,15 +3013,18 @@ static inline void __devinit nct6775_init_device(struct nct6775_data *data)
 	}
 }
 
-static void __devinit
+static int __devinit
 nct6775_check_fan_inputs(const struct nct6775_sio_data *sio_data,
 			 struct nct6775_data *data)
 {
 	int regval;
 	bool fan3pin, fan3min, fan4pin, fan4min, fan5pin;
 	bool pwm3pin, pwm4pin, pwm5pin;
+	int ret;
 
-	superio_enter(sio_data->sioreg);
+	ret = superio_enter(sio_data->sioreg);
+	if (ret)
+		return ret;
 
 	/* fan4 and fan5 share some pins with the GPIO and serial flash */
 	if (data->kind == nct6775) {
@@ -3074,6 +3091,8 @@ nct6775_check_fan_inputs(const struct nct6775_sio_data *sio_data,
 	data->has_fan_min |= (fan4min << 3) | (fan5pin << 4);
 
 	data->has_pwm = 0x03 | (pwm3pin << 2) | (pwm4pin << 3) | (pwm5pin << 4);
+
+	return 0;
 }
 
 static int __devinit nct6775_probe(struct platform_device *pdev)
@@ -3473,7 +3492,10 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 	nct6775_init_device(data);
 
 	data->vrm = vid_which_vrm();
-	superio_enter(sio_data->sioreg);
+	err = superio_enter(sio_data->sioreg);
+	if (err)
+		return err;
+
 	/*
 	 * Read VID value
 	 * We can get the VID input values directly at logical device D 0xe3.
@@ -3508,7 +3530,9 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 	if (err)
 		return err;
 
-	nct6775_check_fan_inputs(sio_data, data);
+	err = nct6775_check_fan_inputs(sio_data, data);
+	if (err)
+		goto exit_remove;
 
 	/* Read fan clock dividers immediately */
 	nct6775_update_fan_div_common(dev, data);
@@ -3688,8 +3712,11 @@ static int __init nct6775_find(int sioaddr, unsigned short *addr,
 
 	u16 val;
 	const char *sio_name;
+	int err;
 
-	superio_enter(sioaddr);
+	err = superio_enter(sioaddr);
+	if (err)
+		return err;
 
 	if (force_id)
 		val = force_id;
