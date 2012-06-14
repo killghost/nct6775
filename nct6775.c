@@ -2909,8 +2909,10 @@ clear_caseopen(struct device *dev, struct device_attribute *attr,
 	 * support clearing the caseopen status through "regular" registers.
 	 */
 	ret = superio_enter(sio_data->sioreg);
-	if (ret)
+	if (ret) {
+		count = ret;
 		goto error;
+	}
 
 	superio_select(sio_data->sioreg, NCT6775_LD_ACPI);
 	reg = superio_inb(sio_data->sioreg, NCT6775_REG_CR_CASEOPEN_CLR[nr]);
@@ -2921,11 +2923,9 @@ clear_caseopen(struct device *dev, struct device_attribute *attr,
 	superio_exit(sio_data->sioreg);
 
 	data->valid = 0;	/* Force cache refresh */
-	ret = count;
 error:
 	mutex_unlock(&data->update_lock);
-
-	return ret;
+	return count;
 }
 
 static struct sensor_device_attribute sda_caseopen[] = {
