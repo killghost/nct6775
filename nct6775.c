@@ -123,7 +123,7 @@ superio_enter(int ioreg)
 	/*
 	 * Try to reserve <ioreg> and <ioreg + 1> for exclusive access.
 	 */
-        if (!request_muxed_region(ioreg, 2, DRVNAME))
+	if (!request_muxed_region(ioreg, 2, DRVNAME))
 		return -EBUSY;
 
 	outb(0x87, ioreg);
