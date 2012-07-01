@@ -316,8 +316,6 @@ static const u16 NCT6776_REG_TEMP_CONFIG[11]
 
 static const u16 NCT6779_REG_TEMP_CONFIG[11] = { 0x18, 0x152 };
 
-static const u16 NCT6775_REG_TEMP_MON[] = { 0x73, 0x75, 0x77, 0x79, 0x7b };
-
 static const u16 NCT6775_REG_AUTO_TEMP[]
 	= { 0x121, 0x221, 0x321, 0x821, 0x921 };
 static const u16 NCT6775_REG_AUTO_PWM[]
@@ -575,7 +573,6 @@ struct nct6775_data {
 				 */
 	const u16 *REG_PWM_READ;
 
-	const u16 *REG_TEMP_MON;
 	const u16 *REG_AUTO_TEMP;
 	const u16 *REG_AUTO_PWM;
 
@@ -633,7 +630,6 @@ struct nct6775_data {
 			 * [5]=weight_duty_step, [6]=weight_duty_base
 			 */
 	u8 target_temp[5];
-	s16 pwm_temp[5];
 	u8 tolerance[5][2];
 
 	u8 fan_time[3][5]; /* 0 = stop_time, 1 = step_up, 2 = step_down */
@@ -912,8 +908,6 @@ static void nct6775_update_pwm_limits(struct device *dev)
 		data->target_temp[i] =
 			nct6775_read_value(data, data->REG_TARGET[i]) &
 					(data->pwm_mode[i] ? 0xff : 0x7f);
-		data->pwm_temp[i] =
-			nct6775_read_value(data, data->REG_TEMP_MON[i]);
 
 		for (j = 0; j < data->auto_pwm_num; j++) {
 			data->auto_pwm[i][j] =
@@ -3188,7 +3182,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_PWM_READ = NCT6775_REG_PWM_READ;
 		data->REG_PWM_MODE = NCT6775_REG_PWM_MODE;
 		data->PWM_MODE_MASK = NCT6775_PWM_MODE_MASK;
-		data->REG_TEMP_MON = NCT6775_REG_TEMP_MON;
 		data->REG_AUTO_TEMP = NCT6775_REG_AUTO_TEMP;
 		data->REG_AUTO_PWM = NCT6775_REG_AUTO_PWM;
 		data->REG_CRITICAL_TEMP = NCT6775_REG_CRITICAL_TEMP;
@@ -3249,7 +3242,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_PWM_READ = NCT6775_REG_PWM_READ;
 		data->REG_PWM_MODE = NCT6776_REG_PWM_MODE;
 		data->PWM_MODE_MASK = NCT6776_PWM_MODE_MASK;
-		data->REG_TEMP_MON = NCT6775_REG_TEMP_MON;
 		data->REG_AUTO_TEMP = NCT6775_REG_AUTO_TEMP;
 		data->REG_AUTO_PWM = NCT6775_REG_AUTO_PWM;
 		data->REG_CRITICAL_TEMP = NCT6775_REG_CRITICAL_TEMP;
@@ -3310,7 +3302,6 @@ static int __devinit nct6775_probe(struct platform_device *pdev)
 		data->REG_PWM_READ = NCT6775_REG_PWM_READ;
 		data->REG_PWM_MODE = NCT6776_REG_PWM_MODE;
 		data->PWM_MODE_MASK = NCT6776_PWM_MODE_MASK;
-		data->REG_TEMP_MON = NCT6775_REG_TEMP_MON;
 		data->REG_AUTO_TEMP = NCT6775_REG_AUTO_TEMP;
 		data->REG_AUTO_PWM = NCT6775_REG_AUTO_PWM;
 		data->REG_CRITICAL_TEMP = NCT6775_REG_CRITICAL_TEMP;
