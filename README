@@ -1,19 +1,21 @@
 Note
 ====
 
-This driver is experimental and has only been tested on NCT6775F and NCT6776F.
-
-ABI (sysfs attribute support) is not final and is expected to change
-repeatedly before the driver is stable. Until then, please feel free
-to provide your input.
-
 This driver supercedes the NCT6775F and NCT6776F support in the W83627EHF
-driver.
+driver. It supports NCT6775F, NCT6776F, and NCT6779D.
+
+Preliminary support for NCT6106D is available in the nct6106 git branch.
+The code in this branch is untested.
+
 
 Kernel driver NCT6775
 =======================
 
 Supported chips:
+  * Nuvoton NCT6106
+    Prefix: 'nct6106'
+    Addresses scanned: ISA address retrieved from Super I/O registers
+    Datasheet: Available from Nuvoton upon request
   * Nuvoton NCT6775F/W83667HG-I
     Prefix: 'nct6775'
     Addresses scanned: ISA address retrieved from Super I/O registers
@@ -33,8 +35,9 @@ Authors:
 Description
 -----------
 
-This driver implements support for the Nuvoton NCT6775F, NCT6776F, and NCT6779D
-super I/O chips. We will refer to them collectively as Nuvoton chips.
+This driver implements support for the Nuvoton NCT6106D, NCT6775F, NCT6776F,
+and NCT6779D super I/O chips. We will refer to them collectively as Nuvoton
+chips.
 
 The chips implement up to 8 temperature sensors depending on the chip type and
 configuration. Temperatures used to control fan speed are reported separately.
@@ -72,14 +75,8 @@ is driven slower/faster to reach the predefined range again.
 
 The mode works for fan1-fan5.
 
-The temperature source used to control pwm1..pwm5 can be configured with
-pwm[1..5]_temp_sel and pwm[1..5]_weight_temp_sel. The value reported and
-configured with those attributes is the temperature sensor attribute index.
-For example, to map the source of temp1_input to pwm1_temp_sel, write 1
-into the pwm1_temp_sel attribute.
-
-/sys files
-----------
+sysfs attributes
+----------------
 
 name - this is a standard hwmon device entry, it contains the name of
        the device (see the prefix in the list of supported devices at
@@ -100,8 +97,35 @@ pwm[1-5]_mode - controls if output is PWM or DC level
         * 0 DC output (0 - 12v)
         * 1 PWM output
 
-Thermal Cruise mode
--------------------
+Common fan control attributes
+-----------------------------
+
+pwm[1-5]_temp_sel	Temperature source. Value is temperature sensor index.
+			For example, select '1' for temp1_input.
+pwm[1-5]_weight_temp_sel
+			Secondary temperature source. Value is temperature
+			sensor index. For example, select '1' for temp1_input.
+pwm[1-5]_weight_enable	Set to 1 to enable secondary temperature control.
+
+If secondary temperature functionality is enabled, it is controlled with the
+following attributes.
+
+pwm[1-5]_weight_duty_step
+			Duty step size.
+pwm[1-5]_weight_temp_step
+			Temperature step size. With each step over
+			temp_step_base, the value of weight_duty_step is added
+			to the current pwm value.
+pwm[1-5]_weight_temp_step_base
+			Temperature at which secondary temperature control kicks
+			in.
+pwm[1-5]_weight_temp_step_tol
+			Temperature step tolerance or hysteresis. This is a
+			relative value.
+
+
+Thermal Cruise mode (2)
+-----------------------
 
 If the temperature is in the range defined by:
 
@@ -117,34 +141,56 @@ using the following steps and times.
 
 pwm[1-5]_start_output	fan pwm start value (range 1 - 255), to start fan
 			when the temperature is above defined range.
-pwm[1-5]_stop_output	fan pwm (range 1 - 255) to stop fan.
+pwm[1-5]_stop_output	lowest fan pwm (range 1 - 255) if temperature is below
+			the defined range.
+pwm[1-5]_stop_output_enable
+			Set to 1 to enable pwm[1-5]_stop_output. If disabled
+			(set to 0), the fan will stop if the temperature is
+			below the defined range.
 pwm[1-5]_step_up_time	milliseconds [ms] before fan speed is increased
 pwm[1-5]_step_down_time	milliseconds [ms] before fan speed is decreased
 pwm[1-5]_stop_time	how many milliseconds [ms] must elapse to switch
-                      	corresponding fan off. (when the temperature was below
+                      	corresponding fan off (when the temperature was below
                       	defined range).
 
-Speed Cruise mode
------------------
+Speed Cruise mode (3)
+---------------------
 
 This modes tries to keep the fan speed constant.
 Untested; use at your own risk.
+
+Smart Fan IV mode (5)
+---------------------
+
+The fan is regulated to maintain a target temperature. There are five data
+points. Subsequent data points should be set to higher temperatures and higher
+pwm values to achieve higher fan speeds with increasing temperature. The last
+data point reflects critical temperature mode, in which the fans should run at
+full speed.
+
+pwm[1-5]_auto_point[1-5]_pwm
+			pwm value to be set if temperature reaches matching
+			temperature range.
+pwm[1-5]_auto_point[1-5]_temp
+			Temperature at which the matching pwm is enabled.
+pwm[1-5]_step_up_time	milliseconds [ms] before fan speed is increased
+pwm[1-5]_step_down_time	milliseconds [ms] before fan speed is decreased
+pwm[1-5]_step_enable	Set to 1 to enable fine grain speed control.
+			If disabled, pwm values will increase or decrease to
+			the values configured in the auto_point_pwm attributes.
+			If enabled, pwm values will be interpolated, resulting
+			in a more fine-grained fan control, resulting in a more
+			fine-grained fan control
 
 
 Usage Notes
 -----------
 
-On various ASUS boards, it appears that CPUTIN is not really connected to
-anything and floats, or that it is connected to some non-standard temperature
-measurement device. As a result, the temperature reported on CPUTIN will not
-reflect a usable value. It often reports unreasonablyy high temperatures, and in
-some cases the reported temperature declines if the actual temperature
-increases.
-CPUTIN should therefore be be ignored on ASUS boards. The CPU temperature
-on ASUS boards is reported from PECI 0.
-
-
-Implementation Details
-----------------------
-
-TBD
+On various ASUS boards with NCT6776F, it appears that CPUTIN is not really
+connected to anything and floats, or that it is connected to some non-standard
+temperature measurement device. As a result, the temperature reported on CPUTIN
+will not reflect a usable value. It often reports unreasonablyy high
+temperatures, and in some cases the reported temperature declines if the actual
+temperature increases (similar to the raw PECI temperature value - see PECI
+specification for details). CPUTIN should therefore be be ignored on ASUS
+boards. The CPU temperature on ASUS boards is reported from PECI 0.
