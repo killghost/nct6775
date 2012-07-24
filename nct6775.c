@@ -612,7 +612,8 @@ struct nct6775_data {
 	u8 temp_fixed_num;	/* 3 or 6 */
 	u8 temp_type[NUM_TEMP_FIXED];
 	s8 temp_offset[NUM_TEMP_FIXED];
-	s16 temp[3][NUM_TEMP]; /* 0=temp, 1=temp_over, 2=temp_hyst */
+	s16 temp[4][NUM_TEMP]; /* 0=temp, 1=temp_over, 2=temp_hyst,
+				* 3=temp_crit */
 	u64 alarms;
 
 	u8 pwm_num;	/* number of pwm */
