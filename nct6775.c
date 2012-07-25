@@ -162,6 +162,13 @@ superio_exit(int ioreg)
  * REG_CHIP_ID is at port 0x58
  */
 
+#define NUM_TEMP	10	/* Max number of temp attribute sets w/ limits*/
+#define NUM_TEMP_FIXED	6	/* Max number of fixed temp attribute sets */
+
+#define NUM_REG_ALARM	4	/* Max number of alarm registers */
+
+/* Common and NCT6775 specific data */
+
 /* Voltage min/max registers for nr=7..14 are in bank 5 */
 
 static const u16 NCT6775_REG_IN_MAX[] = {
@@ -174,11 +181,6 @@ static const u16 NCT6775_REG_IN[] = {
 	0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x550, 0x551, 0x552
 };
 
-static const u16 NCT6779_REG_IN[] = {
-	0x480, 0x481, 0x482, 0x483, 0x484, 0x485, 0x486, 0x487,
-	0x488, 0x489, 0x48a, 0x48b, 0x48c, 0x48d, 0x48e
-};
-
 #define NCT6775_REG_VBAT		0x5D
 #define NCT6775_REG_DIODE		0x5E
 
@@ -187,37 +189,18 @@ static const u16 NCT6779_REG_IN[] = {
 
 #define NCT6775_REG_CR_FAN_DEBOUNCE	0xf0
 
-static const u16 NCT6775_REG_ALARM[6] = { 0x459, 0x45A, 0x45B };
-static const u16 NCT6779_REG_ALARM[6] = { 0x459, 0x45A, 0x45B, 0x568 };
+static const u16 NCT6775_REG_ALARM[NUM_REG_ALARM] = { 0x459, 0x45A, 0x45B };
 
 /* 0..15 voltages, 16..23 fans, 24..31 temperatures */
 
-static const s8 NCT6775_ALARM_BITS[]
-	= { 0, 1, 2, 3, 8, 21, 20, 16,		/* in0.. in7 */
-	    17, -1, -1, -1, -1, -1, -1,		/* in8..in14 */
-	    -1,					/* unused */
-	    6, 7, 11, 10, 23,			/* fan1..fan5 */
-	    -1, -1, -1,				/* unused */
-	    4, 5, 13, -1, -1, -1,		/* temp1..temp6 */
-	    12, -1 };				/* intrusion0, intrusion1 */
-
-static const s8 NCT6776_ALARM_BITS[]
-	= { 0, 1, 2, 3, 8, 21, 20, 16,		/* in0.. in7 */
-	    17, -1, -1, -1, -1, -1, -1,		/* in8..in14 */
-	    -1,					/* unused */
-	    6, 7, 11, 10, 23,			/* fan1..fan5 */
-	    -1, -1, -1,				/* unused */
-	    4, 5, 13, -1, -1, -1,		/* temp1..temp6 */
-	    12, 9 };				/* intrusion0, intrusion1 */
-
-static const s8 NCT6779_ALARM_BITS[]
-	= { 0, 1, 2, 3, 8, 21, 20, 16,		/* in0.. in7 */
-	    17, 24, 25, 26, 27, 28, 29,		/* in8..in14 */
-	    -1,					/* unused */
-	    6, 7, 11, 10, 23,			/* fan1..fan5 */
-	    -1, -1, -1,				/* unused */
-	    4, 5, 13, -1, -1, -1,		/* temp1..temp6 */
-	    12, 9 };				/* intrusion0, intrusion1 */
+static const s8 NCT6775_ALARM_BITS[] = {
+	0, 1, 2, 3, 8, 21, 20, 16,	/* in0.. in7 */
+	17, -1, -1, -1, -1, -1, -1,	/* in8..in14 */
+	-1,				/* unused */
+	6, 7, 11, 10, 23,		/* fan1..fan5 */
+	-1, -1, -1,			/* unused */
+	4, 5, 13, -1, -1, -1,		/* temp1..temp6 */
+	12, -1 };			/* intrusion0, intrusion1 */
 
 #define FAN_ALARM_BASE		16
 #define TEMP_ALARM_BASE		24
@@ -230,15 +213,9 @@ static const u8 NCT6775_CR_CASEOPEN_CLR_MASK[] = { 0x20, 0x01 };
 static const u8 NCT6775_REG_PWM_MODE[] = { 0x04, 0x04, 0x12 };
 static const u8 NCT6775_PWM_MODE_MASK[] = { 0x01, 0x02, 0x01 };
 
-static const u8 NCT6776_REG_PWM_MODE[] = { 0x04, 0, 0 };
-static const u8 NCT6776_PWM_MODE_MASK[] = { 0x01, 0, 0 };
-
 /* Advanced Fan control, some values are common for all fans */
 
 static const u16 NCT6775_REG_FAN_PULSES[] = { 0x641, 0x642, 0x643, 0x644, 0 };
-static const u16 NCT6776_REG_FAN_PULSES[] = { 0x644, 0x645, 0x646, 0, 0 };
-static const u16 NCT6779_REG_FAN_PULSES[]
-	= { 0x644, 0x645, 0x646, 0x647, 0x648 };
 
 static const u16 NCT6775_REG_TARGET[] = { 0x101, 0x201, 0x301, 0x801, 0x901 };
 static const u16 NCT6775_REG_FAN_MODE[] = { 0x102, 0x202, 0x302, 0x802, 0x902 };
@@ -255,71 +232,47 @@ static const u16 NCT6775_REG_FAN_STEP_ENABLE[] = {
 static const u16 NCT6775_REG_FAN_MAX_OUTPUT[] = { 0x10a, 0x20a, 0x30a };
 static const u16 NCT6775_REG_FAN_STEP_OUTPUT[] = { 0x10b, 0x20b, 0x30b };
 
-static const u16 NCT6775_REG_FAN_STOP_TIME[]
-	= { 0x107, 0x207, 0x307, 0x807, 0x907 };
+static const u16 NCT6775_REG_FAN_STOP_TIME[] = {
+	0x107, 0x207, 0x307, 0x807, 0x907 };
 static const u16 NCT6775_REG_PWM[] = { 0x109, 0x209, 0x309, 0x809, 0x909 };
 static const u16 NCT6775_REG_PWM_READ[] = { 0x01, 0x03, 0x11, 0x13, 0x15 };
 
 static const u16 NCT6775_REG_FAN[] = { 0x630, 0x632, 0x634, 0x636, 0x638 };
 static const u16 NCT6775_REG_FAN_MIN[] = { 0x3b, 0x3c, 0x3d };
 
-static const u16 NCT6776_REG_FAN_MIN[] = { 0x63a, 0x63c, 0x63e, 0x640, 0x642};
+static const u16 NCT6775_REG_TEMP[] = {
+	0x27, 0x150, 0x250, 0x62b, 0x62c, 0x62d };
 
-static const u16 NCT6779_REG_FAN[] = { 0x4b0, 0x4b2, 0x4b4, 0x4b6, 0x4b8 };
+static const u16 NCT6775_REG_TEMP_CONFIG[] = {
+	0, 0x152, 0x252, 0x628, 0x629, 0x62A };
+static const u16 NCT6775_REG_TEMP_HYST[] = {
+	0x3a, 0x153, 0x253, 0x673, 0x678, 0x67D };
+static const u16 NCT6775_REG_TEMP_OVER[] = {
+	0x39, 0x155, 0x255, 0x672, 0x677, 0x67C };
 
-static const u16 NCT6779_REG_TOLERANCE_H[]
-	= { 0x10c, 0x20c, 0x30c, 0x80c, 0x90c };
+static const u16 NCT6775_REG_TEMP_SOURCE[] = {
+	0x621, 0x622, 0x623, 0x624, 0x625, 0x626 };
 
-static const u16 NCT6775_REG_TEMP[]
-	= { 0x27, 0x150, 0x250, 0x62b, 0x62c, 0x62d };
-static const u16 NCT6779_REG_TEMP[] = { 0x27, 0x150 };
+static const u16 NCT6775_REG_TEMP_SEL[] = {
+	0x100, 0x200, 0x300, 0x800, 0x900 };
 
-static const u16 NCT6775_REG_TEMP_CONFIG[]
-	= { 0, 0x152, 0x252, 0x628, 0x629, 0x62A };
-static const u16 NCT6775_REG_TEMP_HYST[]
-	= { 0x3a, 0x153, 0x253, 0x673, 0x678, 0x67D };
-static const u16 NCT6775_REG_TEMP_OVER[]
-	= { 0x39, 0x155, 0x255, 0x672, 0x677, 0x67C };
-
-static const u16 NCT6779_REG_TEMP_HYST[]
-	= { 0x3a, 0x153, 0, 0, 0, 0 };
-static const u16 NCT6779_REG_TEMP_OVER[]
-	= { 0x39, 0x155, 0, 0, 0, 0 };
-
-static const u16 NCT6775_REG_TEMP_SOURCE[]
-	= { 0x621, 0x622, 0x623, 0x624, 0x625, 0x626 };
-
-static const u16 NCT6775_REG_TEMP_SEL[]
-	= { 0x100, 0x200, 0x300, 0x800, 0x900 };
-
-static const u16 NCT6775_REG_WEIGHT_TEMP_SEL[]
-	= { 0x139, 0x239, 0x339, 0x839, 0x939 };
-static const u16 NCT6775_REG_WEIGHT_TEMP_STEP[]
-	= { 0x13a, 0x23a, 0x33a, 0x83a, 0x93a };
-static const u16 NCT6775_REG_WEIGHT_TEMP_STEP_TOL[]
-	= { 0x13b, 0x23b, 0x33b, 0x83b, 0x93b };
-static const u16 NCT6775_REG_WEIGHT_DUTY_STEP[]
-	= { 0x13c, 0x23c, 0x33c, 0x83c, 0x93c };
-static const u16 NCT6775_REG_WEIGHT_TEMP_BASE[]
-	= { 0x13d, 0x23d, 0x33d, 0x83d, 0x93d };
-
-static const u16 NCT6776_REG_WEIGHT_DUTY_BASE[]
-	= { 0x13e, 0x23e, 0x33e, 0x83e, 0x93e };
+static const u16 NCT6775_REG_WEIGHT_TEMP_SEL[] = {
+	0x139, 0x239, 0x339, 0x839, 0x939 };
+static const u16 NCT6775_REG_WEIGHT_TEMP_STEP[] = {
+	0x13a, 0x23a, 0x33a, 0x83a, 0x93a };
+static const u16 NCT6775_REG_WEIGHT_TEMP_STEP_TOL[] = {
+	0x13b, 0x23b, 0x33b, 0x83b, 0x93b };
+static const u16 NCT6775_REG_WEIGHT_DUTY_STEP[] = {
+	0x13c, 0x23c, 0x33c, 0x83c, 0x93c };
+static const u16 NCT6775_REG_WEIGHT_TEMP_BASE[] = {
+	0x13d, 0x23d, 0x33d, 0x83d, 0x93d };
 
 static const u16 NCT6775_REG_TEMP_OFFSET[] = { 0x454, 0x455, 0x456 };
 
-static const u16 NCT6779_REG_TEMP_OFFSET[]
-	= { 0x454, 0x455, 0x456, 0x44a, 0x44b, 0x44c };
-
-static const u16 NCT6776_REG_TEMP_CONFIG[11]
-	= { 0x18, 0x152, 0x252, 0x628, 0x629, 0x62A };
-
-static const u16 NCT6779_REG_TEMP_CONFIG[11] = { 0x18, 0x152 };
-
-static const u16 NCT6775_REG_AUTO_TEMP[]
-	= { 0x121, 0x221, 0x321, 0x821, 0x921 };
-static const u16 NCT6775_REG_AUTO_PWM[]
-	= { 0x127, 0x227, 0x327, 0x827, 0x927 };
+static const u16 NCT6775_REG_AUTO_TEMP[] = {
+	0x121, 0x221, 0x321, 0x821, 0x921 };
+static const u16 NCT6775_REG_AUTO_PWM[] = {
+	0x127, 0x227, 0x327, 0x827, 0x927 };
 
 #define NCT6775_AUTO_TEMP(data, nr, p)	((data)->REG_AUTO_TEMP[nr] + (p))
 #define NCT6775_AUTO_PWM(data, nr, p)	((data)->REG_AUTO_PWM[nr] + (p))
@@ -330,11 +283,6 @@ static const u16 NCT6775_REG_CRITICAL_TEMP[] = {
 	0x135, 0x235, 0x335, 0x835, 0x935 };
 static const u16 NCT6775_REG_CRITICAL_TEMP_TOLERANCE[] = {
 	0x138, 0x238, 0x338, 0x838, 0x938 };
-
-static const u16 NCT6779_REG_CRITICAL_PWM_ENABLE[] = {
-	0x136, 0x236, 0x336, 0x836, 0x936 };
-static const u16 NCT6779_REG_CRITICAL_PWM[] = {
-	0x137, 0x237, 0x337, 0x837, 0x937 };
 
 static const char *const nct6775_temp_label[] = {
 	"",
@@ -359,6 +307,36 @@ static const char *const nct6775_temp_label[] = {
 	"PCH_DIM2_TEMP",
 	"PCH_DIM3_TEMP"
 };
+
+static const u16 NCT6775_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6775_temp_label) - 1]
+	= { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x661, 0x662, 0x664 };
+
+static const u16 NCT6775_REG_TEMP_CRIT[ARRAY_SIZE(nct6775_temp_label) - 1]
+	= { 0, 0, 0, 0, 0xa00, 0xa01, 0xa02, 0xa03, 0xa04, 0xa05, 0xa06,
+	    0xa07 };
+
+/* NCT6776 specific data */
+
+static const s8 NCT6776_ALARM_BITS[] = {
+	0, 1, 2, 3, 8, 21, 20, 16,	/* in0.. in7 */
+	17, -1, -1, -1, -1, -1, -1,	/* in8..in14 */
+	-1,				/* unused */
+	6, 7, 11, 10, 23,		/* fan1..fan5 */
+	-1, -1, -1,			/* unused */
+	4, 5, 13, -1, -1, -1,		/* temp1..temp6 */
+	12, 9 };			/* intrusion0, intrusion1 */
+
+static const u8 NCT6776_REG_PWM_MODE[] = { 0x04, 0, 0 };
+static const u8 NCT6776_PWM_MODE_MASK[] = { 0x01, 0, 0 };
+
+static const u16 NCT6776_REG_FAN_PULSES[] = { 0x644, 0x645, 0x646, 0, 0 };
+static const u16 NCT6776_REG_FAN_MIN[] = { 0x63a, 0x63c, 0x63e, 0x640, 0x642 };
+
+static const u16 NCT6776_REG_WEIGHT_DUTY_BASE[] = {
+	0x13e, 0x23e, 0x33e, 0x83e, 0x93e };
+
+static const u16 NCT6776_REG_TEMP_CONFIG[11] = {
+	0x18, 0x152, 0x252, 0x628, 0x629, 0x62A };
 
 static const char *const nct6776_temp_label[] = {
 	"",
@@ -385,6 +363,51 @@ static const char *const nct6776_temp_label[] = {
 	"PCH_DIM3_TEMP",
 	"BYTE_TEMP"
 };
+
+static const u16 NCT6776_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6776_temp_label) - 1]
+	= { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x401, 0x402, 0x404 };
+
+static const u16 NCT6776_REG_TEMP_CRIT[ARRAY_SIZE(nct6776_temp_label) - 1]
+	= { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x709, 0x70a };
+
+/* NCT6779 specific data */
+
+static const u16 NCT6779_REG_IN[] = {
+	0x480, 0x481, 0x482, 0x483, 0x484, 0x485, 0x486, 0x487,
+	0x488, 0x489, 0x48a, 0x48b, 0x48c, 0x48d, 0x48e };
+
+static const u16 NCT6779_REG_ALARM[NUM_REG_ALARM] = {
+	0x459, 0x45A, 0x45B, 0x568 };
+
+static const s8 NCT6779_ALARM_BITS[] = {
+	0, 1, 2, 3, 8, 21, 20, 16,	/* in0.. in7 */
+	17, 24, 25, 26, 27, 28, 29,	/* in8..in14 */
+	-1,				/* unused */
+	6, 7, 11, 10, 23,		/* fan1..fan5 */
+	-1, -1, -1,			/* unused */
+	4, 5, 13, -1, -1, -1,		/* temp1..temp6 */
+	12, 9 };			/* intrusion0, intrusion1 */
+
+static const u16 NCT6779_REG_FAN_PULSES[] = {
+	0x644, 0x645, 0x646, 0x647, 0x648 };
+
+static const u16 NCT6779_REG_FAN[] = { 0x4b0, 0x4b2, 0x4b4, 0x4b6, 0x4b8 };
+
+static const u16 NCT6779_REG_TOLERANCE_H[] = {
+	0x10c, 0x20c, 0x30c, 0x80c, 0x90c };
+
+static const u16 NCT6779_REG_CRITICAL_PWM_ENABLE[] = {
+	0x136, 0x236, 0x336, 0x836, 0x936 };
+static const u16 NCT6779_REG_CRITICAL_PWM[] = {
+	0x137, 0x237, 0x337, 0x837, 0x937 };
+
+static const u16 NCT6779_REG_TEMP[] = { 0x27, 0x150 };
+static const u16 NCT6779_REG_TEMP_HYST[] = { 0x3a, 0x153, 0, 0, 0, 0 };
+static const u16 NCT6779_REG_TEMP_OVER[] = { 0x39, 0x155, 0, 0, 0, 0 };
+static const u16 NCT6779_REG_TEMP_OFFSET[] = {
+	0x454, 0x455, 0x456, 0x44a, 0x44b, 0x44c };
+
+static const u16 NCT6779_REG_TEMP_CONFIG[11] = { 0x18, 0x152 };
 
 static const char *const nct6779_temp_label[] = {
 	"",
@@ -416,30 +439,14 @@ static const char *const nct6779_temp_label[] = {
 	"BYTE_TEMP"
 };
 
-static const u16 NCT6775_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6775_temp_label) - 1]
-	= { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x661, 0x662, 0x664 };
-
-static const u16 NCT6776_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6776_temp_label) - 1]
-	= { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x401, 0x402, 0x404 };
-
 static const u16 NCT6779_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6779_temp_label) - 1]
 	= { 0x490, 0x491, 0x492, 0x493, 0x494, 0x495, 0, 0,
 	    0, 0, 0, 0, 0, 0, 0, 0,
 	    0, 0x400, 0x401, 0x402, 0x404, 0x405, 0x406, 0x407,
 	    0x408, 0 };
 
-static const u16 NCT6775_REG_TEMP_CRIT[ARRAY_SIZE(nct6775_temp_label) - 1]
-	= { 0, 0, 0, 0, 0xa00, 0xa01, 0xa02, 0xa03, 0xa04, 0xa05, 0xa06,
-	    0xa07 };
-
-static const u16 NCT6776_REG_TEMP_CRIT[ARRAY_SIZE(nct6776_temp_label) - 1]
-	= { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x709, 0x70a };
-
 static const u16 NCT6779_REG_TEMP_CRIT[ARRAY_SIZE(nct6779_temp_label) - 1]
 	= { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x709, 0x70a };
-
-#define NUM_TEMP	10	/* Max number of temp attribute sets w/ limits*/
-#define NUM_TEMP_FIXED	6	/* Max number of fixed temp attribute sets */
 
 static inline int reg_to_pwm_enable(int pwm, int mode)
 {
@@ -955,7 +962,7 @@ static struct nct6775_data *nct6775_update_device(struct device *dev)
 	mutex_lock(&data->update_lock);
 
 	if (time_after(jiffies, data->last_updated + HZ + HZ/2)
-	 || !data->valid) {
+	    || !data->valid) {
 		/* Fan clock dividers */
 		nct6775_update_fan_div_common(dev, data);
 
@@ -1002,8 +1009,8 @@ static struct nct6775_data *nct6775_update_device(struct device *dev)
 				nct6775_write_fan_div_common(dev, data, i);
 				/* Preserve min limit if possible */
 				if ((data->has_fan_min & (1 << i))
-				 && data->fan_min[i] >= 2
-				 && data->fan_min[i] != 255)
+				    && data->fan_min[i] >= 2
+				    && data->fan_min[i] != 255)
 					nct6775_write_value(data,
 						data->REG_FAN_MIN[i],
 						(data->fan_min[i] /= 2));
@@ -1030,7 +1037,7 @@ static struct nct6775_data *nct6775_update_device(struct device *dev)
 		}
 
 		data->alarms = 0;
-		for (i = 0; i < 6; i++) {
+		for (i = 0; i < NUM_REG_ALARM; i++) {
 			u8 alarm;
 			if (!data->REG_ALARM[i])
 				continue;
@@ -1153,35 +1160,35 @@ static SENSOR_DEVICE_ATTR_2(in14_min, S_IWUSR | S_IRUGO, show_in_reg,
 			    store_in_reg, 14, 1);
 
 static SENSOR_DEVICE_ATTR_2(in0_max, S_IWUSR | S_IRUGO, show_in_reg,
-			  store_in_reg, 0, 2);
+			    store_in_reg, 0, 2);
 static SENSOR_DEVICE_ATTR_2(in1_max, S_IWUSR | S_IRUGO, show_in_reg,
-			  store_in_reg, 1, 2);
+			    store_in_reg, 1, 2);
 static SENSOR_DEVICE_ATTR_2(in2_max, S_IWUSR | S_IRUGO, show_in_reg,
-			  store_in_reg, 2, 2);
+			    store_in_reg, 2, 2);
 static SENSOR_DEVICE_ATTR_2(in3_max, S_IWUSR | S_IRUGO, show_in_reg,
-			  store_in_reg, 3, 2);
+			    store_in_reg, 3, 2);
 static SENSOR_DEVICE_ATTR_2(in4_max, S_IWUSR | S_IRUGO, show_in_reg,
-			  store_in_reg, 4, 2);
+			    store_in_reg, 4, 2);
 static SENSOR_DEVICE_ATTR_2(in5_max, S_IWUSR | S_IRUGO, show_in_reg,
-			  store_in_reg, 5, 2);
+			    store_in_reg, 5, 2);
 static SENSOR_DEVICE_ATTR_2(in6_max, S_IWUSR | S_IRUGO, show_in_reg,
-			  store_in_reg, 6, 2);
+			    store_in_reg, 6, 2);
 static SENSOR_DEVICE_ATTR_2(in7_max, S_IWUSR | S_IRUGO, show_in_reg,
-			  store_in_reg, 7, 2);
+			    store_in_reg, 7, 2);
 static SENSOR_DEVICE_ATTR_2(in8_max, S_IWUSR | S_IRUGO, show_in_reg,
-			  store_in_reg, 8, 2);
+			    store_in_reg, 8, 2);
 static SENSOR_DEVICE_ATTR_2(in9_max, S_IWUSR | S_IRUGO, show_in_reg,
-			  store_in_reg, 9, 2);
+			    store_in_reg, 9, 2);
 static SENSOR_DEVICE_ATTR_2(in10_max, S_IWUSR | S_IRUGO, show_in_reg,
-			  store_in_reg, 10, 2);
+			    store_in_reg, 10, 2);
 static SENSOR_DEVICE_ATTR_2(in11_max, S_IWUSR | S_IRUGO, show_in_reg,
-			  store_in_reg, 11, 2);
+			    store_in_reg, 11, 2);
 static SENSOR_DEVICE_ATTR_2(in12_max, S_IWUSR | S_IRUGO, show_in_reg,
-			  store_in_reg, 12, 2);
+			    store_in_reg, 12, 2);
 static SENSOR_DEVICE_ATTR_2(in13_max, S_IWUSR | S_IRUGO, show_in_reg,
-			  store_in_reg, 13, 2);
+			    store_in_reg, 13, 2);
 static SENSOR_DEVICE_ATTR_2(in14_max, S_IWUSR | S_IRUGO, show_in_reg,
-			  store_in_reg, 14, 2);
+			    store_in_reg, 14, 2);
 
 static struct attribute *nct6775_attributes_in[15][5] = {
 	{
@@ -1749,7 +1756,7 @@ show_pwm_mode(struct device *dev, struct device_attribute *attr, char *buf)
 
 static ssize_t
 store_pwm_mode(struct device *dev, struct device_attribute *attr,
-			const char *buf, size_t count)
+	       const char *buf, size_t count)
 {
 	struct nct6775_data *data = dev_get_drvdata(dev);
 	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
@@ -2657,219 +2664,219 @@ store_auto_temp(struct device *dev, struct device_attribute *attr,
  */
 static struct sensor_device_attribute_2 sda_auto_pwm_arrays[] = {
 	SENSOR_ATTR_2(pwm1_auto_point1_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 0, 0),
+		      show_auto_pwm, store_auto_pwm, 0, 0),
 	SENSOR_ATTR_2(pwm1_auto_point1_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 0, 0),
+		      show_auto_temp, store_auto_temp, 0, 0),
 	SENSOR_ATTR_2(pwm1_auto_point1_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 0, 0),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 0, 0),
 	SENSOR_ATTR_2(pwm1_auto_point2_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 0, 1),
+		      show_auto_pwm, store_auto_pwm, 0, 1),
 	SENSOR_ATTR_2(pwm1_auto_point2_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 0, 1),
+		      show_auto_temp, store_auto_temp, 0, 1),
 	SENSOR_ATTR_2(pwm1_auto_point2_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 0, 1),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 0, 1),
 	SENSOR_ATTR_2(pwm1_auto_point3_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 0, 2),
+		      show_auto_pwm, store_auto_pwm, 0, 2),
 	SENSOR_ATTR_2(pwm1_auto_point3_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 0, 2),
+		      show_auto_temp, store_auto_temp, 0, 2),
 	SENSOR_ATTR_2(pwm1_auto_point3_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 0, 2),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 0, 2),
 	SENSOR_ATTR_2(pwm1_auto_point4_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 0, 3),
+		      show_auto_pwm, store_auto_pwm, 0, 3),
 	SENSOR_ATTR_2(pwm1_auto_point4_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 0, 3),
+		      show_auto_temp, store_auto_temp, 0, 3),
 	SENSOR_ATTR_2(pwm1_auto_point4_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 0, 3),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 0, 3),
 	SENSOR_ATTR_2(pwm1_auto_point5_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 0, 4),
+		      show_auto_pwm, store_auto_pwm, 0, 4),
 	SENSOR_ATTR_2(pwm1_auto_point5_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 0, 4),
+		      show_auto_temp, store_auto_temp, 0, 4),
 	SENSOR_ATTR_2(pwm1_auto_point5_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 0, 4),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 0, 4),
 	SENSOR_ATTR_2(pwm1_auto_point6_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 0, 5),
+		      show_auto_pwm, store_auto_pwm, 0, 5),
 	SENSOR_ATTR_2(pwm1_auto_point6_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 0, 5),
+		      show_auto_temp, store_auto_temp, 0, 5),
 	SENSOR_ATTR_2(pwm1_auto_point6_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 0, 5),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 0, 5),
 	SENSOR_ATTR_2(pwm1_auto_point7_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 0, 6),
+		      show_auto_pwm, store_auto_pwm, 0, 6),
 	SENSOR_ATTR_2(pwm1_auto_point7_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 0, 6),
+		      show_auto_temp, store_auto_temp, 0, 6),
 	SENSOR_ATTR_2(pwm1_auto_point7_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 0, 6),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 0, 6),
 
 	SENSOR_ATTR_2(pwm2_auto_point1_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 1, 0),
+		      show_auto_pwm, store_auto_pwm, 1, 0),
 	SENSOR_ATTR_2(pwm2_auto_point1_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 1, 0),
+		      show_auto_temp, store_auto_temp, 1, 0),
 	SENSOR_ATTR_2(pwm2_auto_point1_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 1, 0),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 1, 0),
 	SENSOR_ATTR_2(pwm2_auto_point2_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 1, 1),
+		      show_auto_pwm, store_auto_pwm, 1, 1),
 	SENSOR_ATTR_2(pwm2_auto_point2_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 1, 1),
+		      show_auto_temp, store_auto_temp, 1, 1),
 	SENSOR_ATTR_2(pwm2_auto_point2_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 1, 1),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 1, 1),
 	SENSOR_ATTR_2(pwm2_auto_point3_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 1, 2),
+		      show_auto_pwm, store_auto_pwm, 1, 2),
 	SENSOR_ATTR_2(pwm2_auto_point3_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 1, 2),
+		      show_auto_temp, store_auto_temp, 1, 2),
 	SENSOR_ATTR_2(pwm2_auto_point3_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 1, 2),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 1, 2),
 	SENSOR_ATTR_2(pwm2_auto_point4_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 1, 3),
+		      show_auto_pwm, store_auto_pwm, 1, 3),
 	SENSOR_ATTR_2(pwm2_auto_point4_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 1, 3),
+		      show_auto_temp, store_auto_temp, 1, 3),
 	SENSOR_ATTR_2(pwm2_auto_point4_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 1, 3),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 1, 3),
 	SENSOR_ATTR_2(pwm2_auto_point5_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 1, 4),
+		      show_auto_pwm, store_auto_pwm, 1, 4),
 	SENSOR_ATTR_2(pwm2_auto_point5_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 1, 4),
+		      show_auto_temp, store_auto_temp, 1, 4),
 	SENSOR_ATTR_2(pwm2_auto_point5_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 1, 4),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 1, 4),
 	SENSOR_ATTR_2(pwm2_auto_point6_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 1, 5),
+		      show_auto_pwm, store_auto_pwm, 1, 5),
 	SENSOR_ATTR_2(pwm2_auto_point6_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 1, 5),
+		      show_auto_temp, store_auto_temp, 1, 5),
 	SENSOR_ATTR_2(pwm2_auto_point6_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 1, 5),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 1, 5),
 	SENSOR_ATTR_2(pwm2_auto_point7_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 1, 6),
+		      show_auto_pwm, store_auto_pwm, 1, 6),
 	SENSOR_ATTR_2(pwm2_auto_point7_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 1, 6),
+		      show_auto_temp, store_auto_temp, 1, 6),
 	SENSOR_ATTR_2(pwm2_auto_point7_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 1, 6),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 1, 6),
 
 	SENSOR_ATTR_2(pwm3_auto_point1_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 2, 0),
+		      show_auto_pwm, store_auto_pwm, 2, 0),
 	SENSOR_ATTR_2(pwm3_auto_point1_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 2, 0),
+		      show_auto_temp, store_auto_temp, 2, 0),
 	SENSOR_ATTR_2(pwm3_auto_point1_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 2, 0),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 2, 0),
 	SENSOR_ATTR_2(pwm3_auto_point2_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 2, 1),
+		      show_auto_pwm, store_auto_pwm, 2, 1),
 	SENSOR_ATTR_2(pwm3_auto_point2_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 2, 1),
+		      show_auto_temp, store_auto_temp, 2, 1),
 	SENSOR_ATTR_2(pwm3_auto_point2_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 2, 1),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 2, 1),
 	SENSOR_ATTR_2(pwm3_auto_point3_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 2, 2),
+		      show_auto_pwm, store_auto_pwm, 2, 2),
 	SENSOR_ATTR_2(pwm3_auto_point3_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 2, 2),
+		      show_auto_temp, store_auto_temp, 2, 2),
 	SENSOR_ATTR_2(pwm3_auto_point3_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 2, 2),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 2, 2),
 	SENSOR_ATTR_2(pwm3_auto_point4_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 2, 3),
+		      show_auto_pwm, store_auto_pwm, 2, 3),
 	SENSOR_ATTR_2(pwm3_auto_point4_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 2, 3),
+		      show_auto_temp, store_auto_temp, 2, 3),
 	SENSOR_ATTR_2(pwm3_auto_point4_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 2, 3),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 2, 3),
 	SENSOR_ATTR_2(pwm3_auto_point5_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 2, 4),
+		      show_auto_pwm, store_auto_pwm, 2, 4),
 	SENSOR_ATTR_2(pwm3_auto_point5_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 2, 4),
+		      show_auto_temp, store_auto_temp, 2, 4),
 	SENSOR_ATTR_2(pwm3_auto_point5_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 2, 4),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 2, 4),
 	SENSOR_ATTR_2(pwm3_auto_point6_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 2, 5),
+		      show_auto_pwm, store_auto_pwm, 2, 5),
 	SENSOR_ATTR_2(pwm3_auto_point6_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 2, 5),
+		      show_auto_temp, store_auto_temp, 2, 5),
 	SENSOR_ATTR_2(pwm3_auto_point6_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 2, 5),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 2, 5),
 	SENSOR_ATTR_2(pwm3_auto_point7_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 2, 6),
+		      show_auto_pwm, store_auto_pwm, 2, 6),
 	SENSOR_ATTR_2(pwm3_auto_point7_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 2, 6),
+		      show_auto_temp, store_auto_temp, 2, 6),
 	SENSOR_ATTR_2(pwm3_auto_point7_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 2, 6),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 2, 6),
 
 	SENSOR_ATTR_2(pwm4_auto_point1_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 3, 0),
+		      show_auto_pwm, store_auto_pwm, 3, 0),
 	SENSOR_ATTR_2(pwm4_auto_point1_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 3, 0),
+		      show_auto_temp, store_auto_temp, 3, 0),
 	SENSOR_ATTR_2(pwm4_auto_point1_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 3, 0),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 3, 0),
 	SENSOR_ATTR_2(pwm4_auto_point2_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 3, 1),
+		      show_auto_pwm, store_auto_pwm, 3, 1),
 	SENSOR_ATTR_2(pwm4_auto_point2_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 3, 1),
+		      show_auto_temp, store_auto_temp, 3, 1),
 	SENSOR_ATTR_2(pwm4_auto_point2_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 3, 1),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 3, 1),
 	SENSOR_ATTR_2(pwm4_auto_point3_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 3, 2),
+		      show_auto_pwm, store_auto_pwm, 3, 2),
 	SENSOR_ATTR_2(pwm4_auto_point3_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 3, 2),
+		      show_auto_temp, store_auto_temp, 3, 2),
 	SENSOR_ATTR_2(pwm4_auto_point3_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 3, 2),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 3, 2),
 	SENSOR_ATTR_2(pwm4_auto_point4_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 3, 3),
+		      show_auto_pwm, store_auto_pwm, 3, 3),
 	SENSOR_ATTR_2(pwm4_auto_point4_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 3, 3),
+		      show_auto_temp, store_auto_temp, 3, 3),
 	SENSOR_ATTR_2(pwm4_auto_point4_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 3, 3),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 3, 3),
 	SENSOR_ATTR_2(pwm4_auto_point5_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 3, 4),
+		      show_auto_pwm, store_auto_pwm, 3, 4),
 	SENSOR_ATTR_2(pwm4_auto_point5_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 3, 4),
+		      show_auto_temp, store_auto_temp, 3, 4),
 	SENSOR_ATTR_2(pwm4_auto_point5_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 3, 4),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 3, 4),
 	SENSOR_ATTR_2(pwm4_auto_point6_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 3, 5),
+		      show_auto_pwm, store_auto_pwm, 3, 5),
 	SENSOR_ATTR_2(pwm4_auto_point6_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 3, 5),
+		      show_auto_temp, store_auto_temp, 3, 5),
 	SENSOR_ATTR_2(pwm4_auto_point6_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 3, 5),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 3, 5),
 	SENSOR_ATTR_2(pwm4_auto_point7_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 3, 6),
+		      show_auto_pwm, store_auto_pwm, 3, 6),
 	SENSOR_ATTR_2(pwm4_auto_point7_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 3, 6),
+		      show_auto_temp, store_auto_temp, 3, 6),
 	SENSOR_ATTR_2(pwm4_auto_point7_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 3, 6),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 3, 6),
 
 	SENSOR_ATTR_2(pwm5_auto_point1_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 4, 0),
+		      show_auto_pwm, store_auto_pwm, 4, 0),
 	SENSOR_ATTR_2(pwm5_auto_point1_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 4, 0),
+		      show_auto_temp, store_auto_temp, 4, 0),
 	SENSOR_ATTR_2(pwm5_auto_point1_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 4, 0),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 4, 0),
 	SENSOR_ATTR_2(pwm5_auto_point2_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 4, 1),
+		      show_auto_pwm, store_auto_pwm, 4, 1),
 	SENSOR_ATTR_2(pwm5_auto_point2_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 4, 1),
+		      show_auto_temp, store_auto_temp, 4, 1),
 	SENSOR_ATTR_2(pwm5_auto_point2_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 4, 1),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 4, 1),
 	SENSOR_ATTR_2(pwm5_auto_point3_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 4, 2),
+		      show_auto_pwm, store_auto_pwm, 4, 2),
 	SENSOR_ATTR_2(pwm5_auto_point3_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 4, 2),
+		      show_auto_temp, store_auto_temp, 4, 2),
 	SENSOR_ATTR_2(pwm5_auto_point3_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 4, 2),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 4, 2),
 	SENSOR_ATTR_2(pwm5_auto_point4_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 4, 3),
+		      show_auto_pwm, store_auto_pwm, 4, 3),
 	SENSOR_ATTR_2(pwm5_auto_point4_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 4, 3),
+		      show_auto_temp, store_auto_temp, 4, 3),
 	SENSOR_ATTR_2(pwm5_auto_point4_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 4, 3),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 4, 3),
 	SENSOR_ATTR_2(pwm5_auto_point5_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 4, 4),
+		      show_auto_pwm, store_auto_pwm, 4, 4),
 	SENSOR_ATTR_2(pwm5_auto_point5_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 4, 4),
+		      show_auto_temp, store_auto_temp, 4, 4),
 	SENSOR_ATTR_2(pwm5_auto_point5_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 4, 4),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 4, 4),
 	SENSOR_ATTR_2(pwm5_auto_point6_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 4, 5),
+		      show_auto_pwm, store_auto_pwm, 4, 5),
 	SENSOR_ATTR_2(pwm5_auto_point6_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 4, 5),
+		      show_auto_temp, store_auto_temp, 4, 5),
 	SENSOR_ATTR_2(pwm5_auto_point6_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 4, 5),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 4, 5),
 	SENSOR_ATTR_2(pwm5_auto_point7_pwm, S_IWUSR | S_IRUGO,
-			  show_auto_pwm, store_auto_pwm, 4, 6),
+		      show_auto_pwm, store_auto_pwm, 4, 6),
 	SENSOR_ATTR_2(pwm5_auto_point7_temp, S_IWUSR | S_IRUGO,
-			  show_auto_temp, store_auto_temp, 4, 6),
+		      show_auto_temp, store_auto_temp, 4, 6),
 	SENSOR_ATTR_2(pwm5_auto_point7_temp_hyst, S_IWUSR | S_IRUGO,
-			  show_auto_temp_hyst, store_auto_temp_hyst, 4, 6),
+		      show_auto_temp_hyst, store_auto_temp_hyst, 4, 6),
 };
 
 static ssize_t
