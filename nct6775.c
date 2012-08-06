@@ -53,6 +53,7 @@
 #include <linux/acpi.h>
 #include <linux/io.h>
 #include "lm75.h"
+#include "compat.h"
 
 #define TESTING
 
