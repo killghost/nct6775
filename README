@@ -189,7 +189,7 @@ Usage Notes
 On various ASUS boards with NCT6776F, it appears that CPUTIN is not really
 connected to anything and floats, or that it is connected to some non-standard
 temperature measurement device. As a result, the temperature reported on CPUTIN
-will not reflect a usable value. It often reports unreasonablyy high
+will not reflect a usable value. It often reports unreasonably high
 temperatures, and in some cases the reported temperature declines if the actual
 temperature increases (similar to the raw PECI temperature value - see PECI
 specification for details). CPUTIN should therefore be be ignored on ASUS
