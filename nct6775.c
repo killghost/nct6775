@@ -56,6 +56,7 @@
 #include <linux/acpi.h>
 #include <linux/io.h>
 #include "lm75.h"
+#include "compat.h"
 
 #define USE_ALTERNATE
 
@@ -857,7 +858,7 @@ static void nct6775_init_fan_div(struct nct6775_data *data)
 	nct6775_update_fan_div_common(data);
 	/*
 	 * For all fans, start with highest divider value if the divider
-	 * register is not innitialized. This ensures that we get a
+	 * register is not initialized. This ensures that we get a
 	 * reading from the fan count register, even if it is not optimal.
 	 * We'll compute a better divider later on.
 	 */
@@ -889,7 +890,8 @@ static void nct6775_init_fan_common(struct device *dev,
 			reg = nct6775_read_value(data, data->REG_FAN_MIN[i]);
 			if (!reg)
 				nct6775_write_value(data, data->REG_FAN_MIN[i],
-						    0xff);
+						    data->has_fan_div ? 0xff
+								      : 0xff1f);
 		}
 	}
 }
