@@ -7,6 +7,11 @@ driver. It supports NCT6775F, NCT6776F, and NCT6779D.
 Preliminary support for NCT6106D is available in the nct6106 git branch.
 The code in this branch is untested.
 
+The driver should be in shape for upstream integration, and has been submitted
+to the lm-sensors mailing list for that purpose. Testing and review feedback
+will be required for the driver to be actually integrated. If you use the latest
+version of this driver, and/or if you can provide review feedback, please let
+the author know.
 
 Kernel driver NCT6775
 =======================
