@@ -473,7 +473,7 @@ static unsigned int step_time_from_reg(u8 reg, u8 mode)
 
 static u8 step_time_to_reg(unsigned int msec, u8 mode)
 {
-	return SENSORS_LIMIT((mode ? (msec + 200) / 400 :
+	return clamp_val((mode ? (msec + 200) / 400 :
 					(msec + 50) / 100), 1, 255);
 }
 
@@ -539,8 +539,7 @@ static inline long in_from_reg(u8 reg, u8 nr)
 
 static inline u8 in_to_reg(u32 val, u8 nr)
 {
-	return SENSORS_LIMIT(DIV_ROUND_CLOSEST(val * 100, scale_in[nr]), 0,
-			     255);
+	return clamp_val(DIV_ROUND_CLOSEST(val * 100, scale_in[nr]), 0, 255);
 }
 
 /*
@@ -1695,7 +1694,7 @@ store_temp_offset(struct device *dev, struct device_attribute *attr,
 	if (err < 0)
 		return err;
 
-	val = SENSORS_LIMIT(DIV_ROUND_CLOSEST(val, 1000), -128, 127);
+	val = clamp_val(DIV_ROUND_CLOSEST(val, 1000), -128, 127);
 
 	mutex_lock(&data->update_lock);
 	data->temp_offset[nr] = val;
@@ -1982,7 +1981,7 @@ store_pwm(struct device *dev, struct device_attribute *attr, const char *buf,
 	err = kstrtoul(buf, 10, &val);
 	if (err < 0)
 		return err;
-	val = SENSORS_LIMIT(val, minval[index], maxval[index]);
+	val = clamp_val(val, minval[index], maxval[index]);
 
 	mutex_lock(&data->update_lock);
 	data->pwm[index][nr] = val;
@@ -2242,8 +2241,8 @@ store_target_temp(struct device *dev, struct device_attribute *attr,
 	if (err < 0)
 		return err;
 
-	val = SENSORS_LIMIT(DIV_ROUND_CLOSEST(val, 1000), 0,
-			    data->target_temp_mask);
+	val = clamp_val(DIV_ROUND_CLOSEST(val, 1000), 0,
+			data->target_temp_mask);
 
 	mutex_lock(&data->update_lock);
 	data->target_temp[nr] = val;
@@ -2279,7 +2278,7 @@ store_target_speed(struct device *dev, struct device_attribute *attr,
 	if (err < 0)
 		return err;
 
-	val = SENSORS_LIMIT(val, 0, 1350000U);
+	val = clamp_val(val, 0, 1350000U);
 	speed = fan_to_reg(val, data->fan_div[nr]);
 
 	mutex_lock(&data->update_lock);
@@ -2317,8 +2316,7 @@ store_temp_tolerance(struct device *dev, struct device_attribute *attr,
 		return err;
 
 	/* Limit tolerance as needed */
-	val = SENSORS_LIMIT(DIV_ROUND_CLOSEST(val, 1000), 0,
-			    data->tolerance_mask);
+	val = clamp_val(DIV_ROUND_CLOSEST(val, 1000), 0, data->tolerance_mask);
 
 	mutex_lock(&data->update_lock);
 	data->temp_tolerance[index][nr] = val;
@@ -2389,7 +2387,7 @@ store_speed_tolerance(struct device *dev, struct device_attribute *attr,
 	       fan_to_reg(high, data->fan_div[nr])) / 2;
 
 	/* Limit tolerance as needed */
-	val = SENSORS_LIMIT(val, 0, data->speed_tolerance_limit);
+	val = clamp_val(val, 0, data->speed_tolerance_limit);
 
 	mutex_lock(&data->update_lock);
 	data->target_speed_tolerance[nr] = val;
@@ -2498,7 +2496,7 @@ store_weight_temp(struct device *dev, struct device_attribute *attr,
 	if (err < 0)
 		return err;
 
-	val = SENSORS_LIMIT(DIV_ROUND_CLOSEST(val, 1000), 0, 255);
+	val = clamp_val(DIV_ROUND_CLOSEST(val, 1000), 0, 255);
 
 	mutex_lock(&data->update_lock);
 	data->weight_temp[index][nr] = val;

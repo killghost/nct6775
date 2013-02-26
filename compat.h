@@ -9,6 +9,10 @@
 #ifndef COMPAT_H
 #define COMPAT_H
 
+#ifndef clamp_val
+#define clamp_val SENSORS_LIMIT
+#endif
+
 #ifndef kstrtol
 #define kstrtol strict_strtol
 #endif
