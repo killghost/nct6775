@@ -243,14 +243,14 @@ static const u16 NCT6775_REG_FAN_PULSES[] = { 0x641, 0x642, 0x643, 0x644, 0 };
 static const u16 NCT6775_REG_TEMP[] = {
 	0x27, 0x150, 0x250, 0x62b, 0x62c, 0x62d };
 
-static const u16 NCT6775_REG_TEMP_CONFIG[] = {
+static const u16 NCT6775_REG_TEMP_CONFIG[ARRAY_SIZE(NCT6775_REG_TEMP)] = {
 	0, 0x152, 0x252, 0x628, 0x629, 0x62A };
-static const u16 NCT6775_REG_TEMP_HYST[] = {
+static const u16 NCT6775_REG_TEMP_HYST[ARRAY_SIZE(NCT6775_REG_TEMP)] = {
 	0x3a, 0x153, 0x253, 0x673, 0x678, 0x67D };
-static const u16 NCT6775_REG_TEMP_OVER[] = {
+static const u16 NCT6775_REG_TEMP_OVER[ARRAY_SIZE(NCT6775_REG_TEMP)] = {
 	0x39, 0x155, 0x255, 0x672, 0x677, 0x67C };
 
-static const u16 NCT6775_REG_TEMP_SOURCE[] = {
+static const u16 NCT6775_REG_TEMP_SOURCE[ARRAY_SIZE(NCT6775_REG_TEMP)] = {
 	0x621, 0x622, 0x623, 0x624, 0x625, 0x626 };
 
 static const u16 NCT6775_REG_TEMP_SEL[] = {
@@ -338,7 +338,7 @@ static const u16 NCT6776_REG_FAN_PULSES[] = { 0x644, 0x645, 0x646, 0, 0 };
 static const u16 NCT6776_REG_WEIGHT_DUTY_BASE[] = {
 	0x13e, 0x23e, 0x33e, 0x83e, 0x93e };
 
-static const u16 NCT6776_REG_TEMP_CONFIG[11] = {
+static const u16 NCT6776_REG_TEMP_CONFIG[ARRAY_SIZE(NCT6775_REG_TEMP)] = {
 	0x18, 0x152, 0x252, 0x628, 0x629, 0x62A };
 
 static const char *const nct6776_temp_label[] = {
@@ -401,12 +401,15 @@ static const u16 NCT6779_REG_CRITICAL_PWM[] = {
 	0x137, 0x237, 0x337, 0x837, 0x937 };
 
 static const u16 NCT6779_REG_TEMP[] = { 0x27, 0x150 };
-static const u16 NCT6779_REG_TEMP_HYST[] = { 0x3a, 0x153, 0, 0, 0, 0 };
-static const u16 NCT6779_REG_TEMP_OVER[] = { 0x39, 0x155, 0, 0, 0, 0 };
+static const u16 NCT6779_REG_TEMP_CONFIG[ARRAY_SIZE(NCT6779_REG_TEMP)] = {
+	0x18, 0x152 };
+static const u16 NCT6779_REG_TEMP_HYST[ARRAY_SIZE(NCT6779_REG_TEMP)] = {
+	0x3a, 0x153 };
+static const u16 NCT6779_REG_TEMP_OVER[ARRAY_SIZE(NCT6779_REG_TEMP)] = {
+	0x39, 0x155 };
+
 static const u16 NCT6779_REG_TEMP_OFFSET[] = {
 	0x454, 0x455, 0x456, 0x44a, 0x44b, 0x44c };
-
-static const u16 NCT6779_REG_TEMP_CONFIG[11] = { 0x18, 0x152 };
 
 static const char *const nct6779_temp_label[] = {
 	"",
