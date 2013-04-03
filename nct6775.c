@@ -1741,7 +1741,7 @@ store_temp_type(struct device *dev, struct device_attribute *attr,
 		break;
 	case 4:	/* thermistor */
 		break;
-	};
+	}
 	nct6775_write_value(data, data->REG_VBAT, vbat);
 	nct6775_write_value(data, data->REG_DIODE, diode);
 
@@ -4073,16 +4073,17 @@ static struct platform_driver nct6775_driver = {
 	.remove		= nct6775_remove,
 };
 
+static const char *nct6775_sio_names[] __initconst = {
+	"NCT6775F",
+	"NCT6776D/F",
+	"NCT6779D",
+};
+
 /* nct6775_find() looks for a '627 in the Super-I/O config space */
 static int __init nct6775_find(int sioaddr, unsigned short *addr,
 			       struct nct6775_sio_data *sio_data)
 {
-	static const char sio_name_NCT6775[] __initconst = "NCT6775F";
-	static const char sio_name_NCT6776[] __initconst = "NCT6776F";
-	static const char sio_name_NCT6779[] __initconst = "NCT6779D";
-
 	u16 val;
-	const char *sio_name;
 	int err;
 
 	err = superio_enter(sioaddr);
@@ -4097,15 +4098,12 @@ static int __init nct6775_find(int sioaddr, unsigned short *addr,
 	switch (val & SIO_ID_MASK) {
 	case SIO_NCT6775_ID:
 		sio_data->kind = nct6775;
-		sio_name = sio_name_NCT6775;
 		break;
 	case SIO_NCT6776_ID:
 		sio_data->kind = nct6776;
-		sio_name = sio_name_NCT6776;
 		break;
 	case SIO_NCT6779_ID:
 		sio_data->kind = nct6779;
-		sio_name = sio_name_NCT6779;
 		break;
 	default:
 		if (val != 0xffff)
@@ -4133,7 +4131,8 @@ static int __init nct6775_find(int sioaddr, unsigned short *addr,
 	}
 
 	superio_exit(sioaddr);
-	pr_info("Found %s chip at %#x\n", sio_name, *addr);
+	pr_info("Found %s or compatible chip at %#x\n",
+		nct6775_sio_names[sio_data->kind], *addr);
 	sio_data->sioreg = sioaddr;
 
 	return 0;
