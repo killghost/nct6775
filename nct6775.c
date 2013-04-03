@@ -473,7 +473,11 @@ static const u16 NCT6106_REG_TEMP[] = { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15 };
 static const u16 NCT6106_REG_TEMP_HYST[] = {
 	0xc3, 0xc7, 0xcb, 0xcf, 0xd3, 0xd7 };
 static const u16 NCT6106_REG_TEMP_OVER[] = {
-	0xc2, 0xc6, 0xca, 0xce, 0xd2, 0xd4 };
+	0xc2, 0xc6, 0xca, 0xce, 0xd2, 0xd6 };
+static const u16 NCT6106_REG_TEMP_CRIT_L[] = {
+	0xc0, 0xc4, 0xc8, 0xcc, 0xd0, 0xd4 };
+static const u16 NCT6106_REG_TEMP_CRIT_H[] = {
+	0xc1, 0xc5, 0xc9, 0xcf, 0xd1, 0xd5 };
 static const u16 NCT6106_REG_TEMP_OFFSET[] = { 0x311, 0x312, 0x313 };
 static const u16 NCT6106_REG_TEMP_CONFIG[] = {
 	0xb7, 0xb8, 0xb9, 0xba, 0xbb, 0xbc };
@@ -518,8 +522,9 @@ static const u16 NCT6106_REG_WEIGHT_DUTY_BASE[] = { 0x16d, 0x17d, 0x18d };
 static const u16 NCT6106_REG_AUTO_TEMP[] = { 0x160, 0x170, 0x180 };
 static const u16 NCT6106_REG_AUTO_PWM[] = { 0x164, 0x174, 0x184 };
 
-static const u16 NCT6106_REG_ALARM[7] =
+static const u16 NCT6106_REG_ALARM[NUM_REG_ALARM] =
 	{ 0x77, 0x78, 0x79, 0x7a, 0x7b, 0x7c, 0x7d };
+
 static const s8 NCT6106_ALARM_BITS[]
 	= { 0, 1, 2, 3, 4, 5, 7, 8,		/* in0.. in7 */
 	    9, -1, -1, -1, -1, -1, -1,		/* in8..in14 */
@@ -645,8 +650,8 @@ struct nct6775_data {
 	struct attribute_group *group_temp;
 	struct attribute_group *group_pwm;
 
-	u16 reg_temp[4][NUM_TEMP]; /* 0=temp, 1=temp_over, 2=temp_hyst,
-				    * 3=temp_crit
+	u16 reg_temp[5][NUM_TEMP]; /* 0=temp, 1=temp_over, 2=temp_hyst,
+				    * 3=temp_crit, 4=temp_lcrit
 				    */
 	u8 temp_src[NUM_TEMP];
 	u16 reg_temp_config[NUM_TEMP];
@@ -1804,8 +1809,8 @@ static umode_t nct6775_temp_is_visible(struct kobject *kobj,
 {
 	struct device *dev = container_of(kobj, struct device, kobj);
 	struct nct6775_data *data = dev_get_drvdata(dev);
-	int temp = index / 8;	/* temp index */
-	int nr = index % 8;	/* attribute index */
+	int temp = index / 9;	/* temp index */
+	int nr = index % 9;	/* attribute index */
 
 	if (!(data->have_temp & (1 << temp)))
 		return 0;
@@ -1819,10 +1824,13 @@ static umode_t nct6775_temp_is_visible(struct kobject *kobj,
 	if (nr == 4 && !data->reg_temp[3][temp])	/* crit */
 		return 0;
 
-	if (nr > 4 && !(data->have_temp_fixed & (1 << temp)))
+	if (nr == 5 && !data->reg_temp[4][temp])	/* lcrit */
 		return 0;
 
-	if (nr == 7 && data->ALARM_BITS[TEMP_ALARM_BASE + temp] < 0)
+	if (nr > 5 && !(data->have_temp_fixed & (1 << temp)))
+		return 0;
+
+	if (nr == 8 && data->ALARM_BITS[TEMP_ALARM_BASE + temp] < 0)
 		return 0;
 
 	return attr->mode;
@@ -1842,6 +1850,8 @@ SENSOR_TEMPLATE(temp_type, temp%d_type, S_IRUGO | S_IWUSR, show_temp_type,
 		store_temp_type, 0);
 SENSOR_TEMPLATE(temp_alarm, temp%d_alarm, S_IRUGO, show_alarm, NULL,
 		TEMP_ALARM_BASE);
+SENSOR_TEMPLATE_2(temp_lcrit, temp%d_lcrit, S_IRUGO | S_IWUSR, show_temp,
+		  store_temp, 0, 4);
 
 /*
  * nct6775_temp_is_visible uses the index into the following array
@@ -1854,9 +1864,10 @@ static struct sensor_device_template *nct6775_attributes_temp_template[] = {
 	&sensor_dev_template_temp_max,		/* 2 */
 	&sensor_dev_template_temp_max_hyst,	/* 3 */
 	&sensor_dev_template_temp_crit,		/* 4 */
-	&sensor_dev_template_temp_offset,	/* 5 */
-	&sensor_dev_template_temp_type,		/* 6 */
-	&sensor_dev_template_temp_alarm,	/* 7 */
+	&sensor_dev_template_temp_lcrit,	/* 5 */
+	&sensor_dev_template_temp_offset,	/* 6 */
+	&sensor_dev_template_temp_type,		/* 7 */
+	&sensor_dev_template_temp_alarm,	/* 8 */
 	NULL
 };
 
@@ -3008,6 +3019,7 @@ static int nct6775_probe(struct platform_device *pdev)
 	int src, mask, available;
 	const u16 *reg_temp, *reg_temp_over, *reg_temp_hyst, *reg_temp_config;
 	const u16 *reg_temp_alternate, *reg_temp_crit;
+	const u16 *reg_temp_crit_l = NULL, *reg_temp_crit_h = NULL;
 	int num_reg_temp;
 	u8 cr2a;
 	struct attribute_group *group;
@@ -3091,6 +3103,8 @@ static int nct6775_probe(struct platform_device *pdev)
 		reg_temp_config = NCT6106_REG_TEMP_CONFIG;
 		reg_temp_alternate = NCT6106_REG_TEMP_ALTERNATE;
 		reg_temp_crit = NCT6106_REG_TEMP_CRIT;
+		reg_temp_crit_l = NCT6106_REG_TEMP_CRIT_L;
+		reg_temp_crit_h = NCT6106_REG_TEMP_CRIT_H;
 
 		break;
 	case nct6775:
@@ -3356,6 +3370,12 @@ static int nct6775_probe(struct platform_device *pdev)
 			data->reg_temp[0][src - 1] = reg_temp[i];
 			data->reg_temp[1][src - 1] = reg_temp_over[i];
 			data->reg_temp[2][src - 1] = reg_temp_hyst[i];
+			if (reg_temp_crit_h && reg_temp_crit_h[i])
+				data->reg_temp[3][src - 1] = reg_temp_crit_h[i];
+			else if (reg_temp_crit[src - 1])
+				data->reg_temp[3][src - 1] = reg_temp_crit[src - 1];
+			if (reg_temp_crit_l && reg_temp_crit_l[i])
+				data->reg_temp[4][src - 1] = reg_temp_crit_l[i];
 			data->reg_temp_config[src - 1] = reg_temp_config[i];
 			data->temp_src[src - 1] = src;
 			continue;
@@ -3370,8 +3390,12 @@ static int nct6775_probe(struct platform_device *pdev)
 		data->reg_temp[1][s] = reg_temp_over[i];
 		data->reg_temp[2][s] = reg_temp_hyst[i];
 		data->reg_temp_config[s] = reg_temp_config[i];
-		if (reg_temp_crit[src - 1])
+		if (reg_temp_crit_h && reg_temp_crit_h[i])
+			data->reg_temp[3][s] = reg_temp_crit_h[i];
+		else if (reg_temp_crit[src - 1])
 			data->reg_temp[3][s] = reg_temp_crit[src - 1];
+		if (reg_temp_crit_l && reg_temp_crit_l[i])
+			data->reg_temp[4][s] = reg_temp_crit_l[i];
 
 		data->temp_src[s] = src;
 		s++;
