@@ -2,10 +2,7 @@ Note
 ====
 
 This driver supercedes the NCT6775F and NCT6776F support in the W83627EHF
-driver. It supports NCT6775F, NCT6776F, and NCT6779D.
-
-Preliminary support for NCT6106D is available in the nct6106 git branch.
-The code in this branch is untested.
+driver. It supports NCT6106D, NCT6775F, NCT6776F, and NCT6779D.
 
 The driver should be in shape for upstream integration, and has been submitted
 to the lm-sensors mailing list for that purpose. Testing and review feedback
@@ -17,7 +14,7 @@ Kernel driver NCT6775
 =======================
 
 Supported chips:
-  * Nuvoton NCT6106
+  * Nuvoton NCT6102D/NCT6104D/NCT6106D
     Prefix: 'nct6106'
     Addresses scanned: ISA address retrieved from Super I/O registers
     Datasheet: Available from Nuvoton upon request
