@@ -497,7 +497,8 @@ static const u16 NCT6106_REG_TEMP_SOURCE[] = {
 	0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5 };
 
 static const u16 NCT6106_REG_CRITICAL_TEMP[] = { 0x11a, 0x12a, 0x13a };
-static const u16 NCT6106_REG_CRITICAL_TEMP_TOLERANCE[] = { 0x11b, 0x12b, 0x13b };
+static const u16 NCT6106_REG_CRITICAL_TEMP_TOLERANCE[] = {
+	0x11b, 0x12b, 0x13b };
 
 static const u16 NCT6106_REG_CRITICAL_PWM_ENABLE[] = { 0x11c, 0x12c, 0x13c };
 #define NCT6106_CRITICAL_PWM_ENABLE_MASK	0x10
@@ -522,17 +523,18 @@ static const u16 NCT6106_REG_WEIGHT_DUTY_BASE[] = { 0x16d, 0x17d, 0x18d };
 static const u16 NCT6106_REG_AUTO_TEMP[] = { 0x160, 0x170, 0x180 };
 static const u16 NCT6106_REG_AUTO_PWM[] = { 0x164, 0x174, 0x184 };
 
-static const u16 NCT6106_REG_ALARM[NUM_REG_ALARM] =
-	{ 0x77, 0x78, 0x79, 0x7a, 0x7b, 0x7c, 0x7d };
+static const u16 NCT6106_REG_ALARM[NUM_REG_ALARM] = {
+	0x77, 0x78, 0x79, 0x7a, 0x7b, 0x7c, 0x7d };
 
-static const s8 NCT6106_ALARM_BITS[]
-	= { 0, 1, 2, 3, 4, 5, 7, 8,		/* in0.. in7 */
-	    9, -1, -1, -1, -1, -1, -1,		/* in8..in14 */
-	    -1,					/* unused */
-	    32, 33, 34, -1, -1,			/* fan1..fan5 */
-	    -1, -1, -1,				/* unused */
-	    16, 17, 18, 19, 20, 21,		/* temp1..temp6 */
-	    48, -1 };				/* intrusion0, intrusion1 */
+static const s8 NCT6106_ALARM_BITS[] = {
+	0, 1, 2, 3, 4, 5, 7, 8,		/* in0.. in7 */
+	9, -1, -1, -1, -1, -1, -1,	/* in8..in14 */
+	-1,				/* unused */
+	32, 33, 34, -1, -1,		/* fan1..fan5 */
+	-1, -1, -1,			/* unused */
+	16, 17, 18, 19, 20, 21,		/* temp1..temp6 */
+	48, -1				/* intrusion0, intrusion1 */
+};
 
 static const u16 NCT6106_REG_TEMP_ALTERNATE[ARRAY_SIZE(nct6776_temp_label) - 1]
 	= { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x51, 0x52, 0x54 };
@@ -1344,7 +1346,7 @@ static struct nct6775_data *nct6775_update_device(struct device *dev)
 					   data->REG_FAN_MIN[i]);
 			data->fan_pulses[i] =
 			  (nct6775_read_value(data, data->REG_FAN_PULSES[i])
-			   	>> data->FAN_PULSE_SHIFT[i]) & 0x03;
+				>> data->FAN_PULSE_SHIFT[i]) & 0x03;
 
 			nct6775_select_fan_div(dev, data, i, reg);
 		}
@@ -3373,7 +3375,8 @@ static int nct6775_probe(struct platform_device *pdev)
 			if (reg_temp_crit_h && reg_temp_crit_h[i])
 				data->reg_temp[3][src - 1] = reg_temp_crit_h[i];
 			else if (reg_temp_crit[src - 1])
-				data->reg_temp[3][src - 1] = reg_temp_crit[src - 1];
+				data->reg_temp[3][src - 1]
+				  = reg_temp_crit[src - 1];
 			if (reg_temp_crit_l && reg_temp_crit_l[i])
 				data->reg_temp[4][src - 1] = reg_temp_crit_l[i];
 			data->reg_temp_config[src - 1] = reg_temp_config[i];
