@@ -3656,11 +3656,11 @@ static const char *nct6775_sio_names[] __initconst = {
 };
 
 /* nct6775_find() looks for a '627 in the Super-I/O config space */
-static int __init nct6775_find(int sioaddr, unsigned short *addr,
-			       struct nct6775_sio_data *sio_data)
+static int __init nct6775_find(int sioaddr, struct nct6775_sio_data *sio_data)
 {
 	u16 val;
 	int err;
+	int addr;
 
 	err = superio_enter(sioaddr);
 	if (err)
@@ -3695,8 +3695,8 @@ static int __init nct6775_find(int sioaddr, unsigned short *addr,
 	superio_select(sioaddr, NCT6775_LD_HWM);
 	val = (superio_inb(sioaddr, SIO_REG_ADDR) << 8)
 	    | superio_inb(sioaddr, SIO_REG_ADDR + 1);
-	*addr = val & IOREGION_ALIGNMENT;
-	if (*addr == 0) {
+	addr = val & IOREGION_ALIGNMENT;
+	if (addr == 0) {
 		pr_err("Refusing to enable a Super-I/O device with a base I/O port 0\n");
 		superio_exit(sioaddr);
 		return -ENODEV;
@@ -3711,10 +3711,10 @@ static int __init nct6775_find(int sioaddr, unsigned short *addr,
 
 	superio_exit(sioaddr);
 	pr_info("Found %s or compatible chip at %#x:%#x\n",
-		nct6775_sio_names[sio_data->kind], sioaddr, *addr);
+		nct6775_sio_names[sio_data->kind], sioaddr, addr);
 	sio_data->sioreg = sioaddr;
 
-	return 0;
+	return addr;
 }
 
 /*
@@ -3729,7 +3729,7 @@ static int __init sensors_nct6775_init(void)
 {
 	int i, err;
 	bool found = false;
-	unsigned short address;
+	int address;
 	struct resource res;
 	struct nct6775_sio_data sio_data;
 	int sioaddr[2] = { 0x2e, 0x4e };
@@ -3746,7 +3746,8 @@ static int __init sensors_nct6775_init(void)
 	 * nct6775 hardware monitor, and call probe()
 	 */
 	for (i = 0; i < ARRAY_SIZE(pdev); i++) {
-		if (nct6775_find(sioaddr[i], &address, &sio_data))
+		address = nct6775_find(sioaddr[i], &sio_data);
+		if (address <= 0)
 			continue;
 
 		found = true;
