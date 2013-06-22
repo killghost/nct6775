@@ -728,6 +728,7 @@ struct nct6775_data {
 	u8 has_fan_min;		/* some fans don't have min register */
 	bool has_fan_div;
 
+	u8 num_temp_alarms;	/* 3 or 6 */
 	u8 temp_fixed_num;	/* 3 or 6 */
 	u8 temp_type[NUM_TEMP_FIXED];
 	s8 temp_offset[NUM_TEMP_FIXED];
@@ -1436,6 +1437,35 @@ show_alarm(struct device *dev, struct device_attribute *attr, char *buf)
 		       (unsigned int)((data->alarms >> nr) & 0x01));
 }
 
+static ssize_t
+show_temp_alarm(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
+	struct nct6775_data *data = nct6775_update_device(dev);
+	int index = sattr->index;
+	unsigned int alarm = 0;
+	int nr;
+
+	/*
+	 * For temperatures, there is no fixed mapping from registers to alarm
+	 * bits. Alarm bits are determined by the temperature source mapping.
+	 * Alarms are generated only for the first <num_temp_alarms> temperature
+	 * sources.
+	 */
+	for (nr = 0; nr < data->num_temp_alarms; nr++) {
+		int src;
+
+		src = nct6775_read_value(data,
+					 data->REG_TEMP_SOURCE[nr]) & 0x1f;
+		if (src == data->temp_src[index]) {
+			int bit = data->ALARM_BITS[nr + TEMP_ALARM_BASE];
+			alarm = (data->alarms >> bit) & 0x01;
+			break;
+		}
+	}
+	return sprintf(buf, "%u\n", alarm);
+}
+
 static umode_t nct6775_in_is_visible(struct kobject *kobj,
 				     struct attribute *attr, int index)
 {
@@ -1823,22 +1853,20 @@ static umode_t nct6775_temp_is_visible(struct kobject *kobj,
 	if (!(data->have_temp & (1 << temp)))
 		return 0;
 
-	if (nr == 2 && !data->reg_temp[1][temp])	/* max */
+	if (nr == 3 && !data->reg_temp[1][temp])	/* max */
 		return 0;
 
-	if (nr == 3 && !data->reg_temp[2][temp])	/* max_hyst */
+	if (nr == 4 && !data->reg_temp[2][temp])	/* max_hyst */
 		return 0;
 
-	if (nr == 4 && !data->reg_temp[3][temp])	/* crit */
+	if (nr == 5 && !data->reg_temp[3][temp])	/* crit */
 		return 0;
 
-	if (nr == 5 && !data->reg_temp[4][temp])	/* lcrit */
+	if (nr == 6 && !data->reg_temp[4][temp])	/* lcrit */
 		return 0;
 
-	if (nr > 5 && !(data->have_temp_fixed & (1 << temp)))
-		return 0;
-
-	if (nr == 8 && data->ALARM_BITS[TEMP_ALARM_BASE + temp] < 0)
+	/* offset and type only apply to fixed sensors */
+	if (nr > 6 && !(data->have_temp_fixed & (1 << temp)))
 		return 0;
 
 	return attr->mode;
@@ -1852,14 +1880,13 @@ SENSOR_TEMPLATE_2(temp_max_hyst, "temp%d_max_hyst", S_IRUGO | S_IWUSR,
 		  show_temp, store_temp, 0, 2);
 SENSOR_TEMPLATE_2(temp_crit, "temp%d_crit", S_IRUGO | S_IWUSR, show_temp,
 		  store_temp, 0, 3);
+SENSOR_TEMPLATE_2(temp_lcrit, "temp%d_lcrit", S_IRUGO | S_IWUSR, show_temp,
+		  store_temp, 0, 4);
 SENSOR_TEMPLATE(temp_offset, "temp%d_offset", S_IRUGO | S_IWUSR,
 		show_temp_offset, store_temp_offset, 0);
 SENSOR_TEMPLATE(temp_type, "temp%d_type", S_IRUGO | S_IWUSR, show_temp_type,
 		store_temp_type, 0);
-SENSOR_TEMPLATE(temp_alarm, "temp%d_alarm", S_IRUGO, show_alarm, NULL,
-		TEMP_ALARM_BASE);
-SENSOR_TEMPLATE_2(temp_lcrit, "temp%d_lcrit", S_IRUGO | S_IWUSR, show_temp,
-		  store_temp, 0, 4);
+SENSOR_TEMPLATE(temp_alarm, "temp%d_alarm", S_IRUGO, show_temp_alarm, NULL, 0);
 
 /*
  * nct6775_temp_is_visible uses the index into the following array
@@ -1869,13 +1896,13 @@ SENSOR_TEMPLATE_2(temp_lcrit, "temp%d_lcrit", S_IRUGO | S_IWUSR, show_temp,
 static struct sensor_device_template *nct6775_attributes_temp_template[] = {
 	&sensor_dev_template_temp_input,
 	&sensor_dev_template_temp_label,
-	&sensor_dev_template_temp_max,		/* 2 */
-	&sensor_dev_template_temp_max_hyst,	/* 3 */
-	&sensor_dev_template_temp_crit,		/* 4 */
-	&sensor_dev_template_temp_lcrit,	/* 5 */
-	&sensor_dev_template_temp_offset,	/* 6 */
-	&sensor_dev_template_temp_type,		/* 7 */
-	&sensor_dev_template_temp_alarm,	/* 8 */
+	&sensor_dev_template_temp_alarm,	/* 2 */
+	&sensor_dev_template_temp_max,		/* 3 */
+	&sensor_dev_template_temp_max_hyst,	/* 4 */
+	&sensor_dev_template_temp_crit,		/* 5 */
+	&sensor_dev_template_temp_lcrit,	/* 6 */
+	&sensor_dev_template_temp_offset,	/* 7 */
+	&sensor_dev_template_temp_type,		/* 8 */
 	NULL
 };
 
@@ -3055,6 +3082,7 @@ static int nct6775_probe(struct platform_device *pdev)
 		data->pwm_num = 3;
 		data->auto_pwm_num = 4;
 		data->temp_fixed_num = 3;
+		data->num_temp_alarms = 6;
 
 		data->fan_from_reg = fan_from_reg13;
 		data->fan_from_reg_min = fan_from_reg13;
@@ -3121,6 +3149,7 @@ static int nct6775_probe(struct platform_device *pdev)
 		data->auto_pwm_num = 6;
 		data->has_fan_div = true;
 		data->temp_fixed_num = 3;
+		data->num_temp_alarms = 3;
 
 		data->ALARM_BITS = NCT6775_ALARM_BITS;
 
@@ -3187,6 +3216,7 @@ static int nct6775_probe(struct platform_device *pdev)
 		data->auto_pwm_num = 4;
 		data->has_fan_div = false;
 		data->temp_fixed_num = 3;
+		data->num_temp_alarms = 3;
 
 		data->ALARM_BITS = NCT6776_ALARM_BITS;
 
@@ -3253,6 +3283,7 @@ static int nct6775_probe(struct platform_device *pdev)
 		data->auto_pwm_num = 4;
 		data->has_fan_div = false;
 		data->temp_fixed_num = 6;
+		data->num_temp_alarms = 3;
 
 		data->ALARM_BITS = NCT6779_ALARM_BITS;
 
