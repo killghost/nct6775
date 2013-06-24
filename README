@@ -2,7 +2,7 @@ Note
 ====
 
 This driver supercedes the NCT6775F and NCT6776F support in the W83627EHF
-driver. It supports NCT6106D, NCT6775F, NCT6776F, and NCT6779D.
+driver. It supports NCT6106D, NCT6775F, NCT6776F, NCT6779D, and NCT6791D.
 
 The driver should be in shape for upstream integration, and has been submitted
 to the lm-sensors mailing list for that purpose. Testing and review feedback
@@ -30,16 +30,21 @@ Supported chips:
     Prefix: 'nct6779'
     Addresses scanned: ISA address retrieved from Super I/O registers
     Datasheet: Available from Nuvoton upon request
+  * Nuvoton NCT6791D
+    Prefix: 'nct6791'
+    Addresses scanned: ISA address retrieved from Super I/O registers
+    Datasheet: Available from Nuvoton upon request
 
 Authors:
         Guenter Roeck <linux@roeck-us.net>
+        David Bartley <andareed@gmail.com> (NCT6791D support)
 
 Description
 -----------
 
 This driver implements support for the Nuvoton NCT6106D, NCT6775F, NCT6776F,
-and NCT6779D super I/O chips. We will refer to them collectively as Nuvoton
-chips.
+NCT6779D, and NCT6791D super I/O chips. We will refer to them collectively as
+Nuvoton chips.
 
 The chips implement up to 8 temperature sensors depending on the chip type and
 configuration. Temperatures used to control fan speed are reported separately.
